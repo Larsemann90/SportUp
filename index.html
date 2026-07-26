@@ -1,0 +1,1718 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SportUp — Teams für den Sportunterricht</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%23C8442C'/%3E%3Ccircle cx='15' cy='33' r='6.5' fill='white'/%3E%3Cpath d='M20 27 L33 14' stroke='white' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M23 14 H34 V25' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
+
+  :root{
+    --bg:#16232E; --panel:#1E2E3A; --panel-border:#24384A; --border:#2D4356;
+    --text:#EAEFF2; --muted:#7C93A3; --muted2:#9FB3C1; --accent:#D9762A; --accent-text:#1B120A;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sans-serif;}
+  button{cursor:pointer;font-family:inherit;}
+  input{font-family:inherit;}
+
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--panel-border);position:sticky;top:0;background:var(--bg);z-index:10;}
+  .header-left{display:flex;align-items:center;gap:12px;}
+  .logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#E08A3D,#C8442C);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,0.3);}
+  .app-title{font-family:'Oswald',sans-serif;font-weight:600;font-size:19px;line-height:1.1;}
+  .app-subtitle{font-size:12px;color:var(--muted);margin-top:2px;}
+
+  .class-picker-wrap{position:relative;}
+  .class-picker-btn{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:9px;font-size:14px;}
+  .class-dropdown{position:absolute;right:0;top:calc(100% + 6px);background:var(--panel);border:1px solid var(--border);border-radius:10px;min-width:220px;padding:6px;box-shadow:0 12px 28px rgba(0,0,0,.4);z-index:20;display:none;}
+  .class-dropdown.open{display:block;}
+  .class-dropdown-item{display:flex;align-items:center;padding:8px;border-radius:6px;font-size:14px;}
+  .class-dropdown-item .name{flex:1;cursor:pointer;}
+  .class-dropdown-item .name .count{opacity:.5;}
+  .class-dropdown-divider{height:1px;background:var(--border);margin:6px 2px;}
+  .new-class-btn{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:none;color:var(--accent);font-size:14px;padding:8px;font-weight:500;}
+
+  .icon-btn{background:transparent;border:none;color:var(--muted);padding:4px;display:inline-flex;}
+
+  .empty-state{display:flex;flex-direction:column;align-items:center;text-align:center;padding:70px 24px;gap:10px;}
+  .empty-icon{width:76px;height:76px;border-radius:50%;background:var(--panel);display:flex;align-items:center;justify-content:center;margin-bottom:8px;font-size:28px;}
+  .empty-title{font-family:'Oswald',sans-serif;font-size:18px;font-weight:600;}
+  .empty-text{font-size:14px;color:var(--muted);max-width:280px;}
+
+  .btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:var(--accent-text);border:none;padding:12px 20px;border-radius:10px;font-size:15px;font-weight:600;margin-top:12px;}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-primary-sm{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:var(--accent-text);border:none;padding:10px 14px;border-radius:9px;font-size:14px;font-weight:600;white-space:nowrap;}
+
+  .sub-header{padding:20px 20px 0;display:flex;flex-direction:column;gap:14px;}
+  .class-name-row{display:flex;align-items:center;gap:8px;}
+  .class-name{font-family:'Oswald',sans-serif;font-size:22px;font-weight:600;margin:0;}
+  .class-name-input{font-family:'Oswald',sans-serif;font-size:20px;font-weight:600;background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 8px;}
+
+  .tab-row{display:flex;gap:6px;border-bottom:1px solid var(--panel-border);}
+  .back-btn{background:transparent;border:none;color:var(--muted2);font-size:14px;padding:2px 0 8px;text-align:left;}
+
+  .home-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .home-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;background:var(--panel);border:1px solid var(--panel-border);border-radius:14px;padding:18px 16px;text-align:left;color:var(--text);min-height:110px;}
+  .home-card:active{background:#24384A;}
+  .home-card-icon{font-size:26px;}
+  .home-card-title{font-family:'Oswald',sans-serif;font-weight:600;font-size:15px;}
+  .home-card-subtitle{font-size:12px;color:var(--muted);}
+  .tab{background:transparent;border:none;color:var(--muted);padding:10px 4px;margin-right:20px;font-size:14px;font-weight:500;border-bottom:2px solid transparent;}
+  .tab.active{color:var(--text);font-weight:600;border-bottom:2px solid var(--accent);}
+
+  .content{padding:20px;max-width:720px;margin:0 auto;}
+
+  .add-row{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+  .text-input{flex:1;min-width:140px;background:var(--panel);border:1px solid var(--border);border-radius:9px;color:var(--text);padding:10px 12px;font-size:14px;}
+
+  .skill-picker{display:flex;gap:2px;align-items:center;}
+  .skill-dot{background:transparent;border:none;padding:2px;font-size:13px;color:#3A3320;}
+  .skill-dot.filled{color:#D9A427;}
+
+  .empty-roster{color:var(--muted);font-size:14px;padding:20px 0;}
+  .roster-list{display:flex;flex-direction:column;gap:6px;}
+  .roster-row{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--panel-border);border-radius:9px;padding:9px 12px;}
+  .roster-name{flex:1;font-size:14.5px;}
+  .roster-name.excluded{opacity:.4;}
+  .chip-btn{background:#24384A;border:1px solid var(--border);color:var(--muted2);font-size:12px;padding:4px 9px;border-radius:999px;font-family:'JetBrains Mono',monospace;}
+  .chip-btn.active{background:#3A2420;border-color:#C8442C;color:#E8A798;}
+  .roster-footer{margin-top:14px;font-size:12.5px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+
+  .control-panel{background:var(--panel);border:1px solid var(--panel-border);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:16px;margin-bottom:22px;}
+  .control-label{font-size:12.5px;color:var(--muted);font-weight:600;letter-spacing:.4px;text-transform:uppercase;}
+  .stepper{display:flex;align-items:center;gap:14px;}
+  .stepper-btn{width:34px;height:34px;border-radius:8px;background:#24384A;border:1px solid var(--border);color:var(--text);font-size:18px;}
+  .stepper-value{font-family:'JetBrains Mono',monospace;font-size:18px;min-width:20px;text-align:center;}
+  .mode-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .mode-btn{display:inline-flex;align-items:center;gap:7px;background:#24384A;border:1px solid var(--border);color:var(--muted2);padding:9px 13px;border-radius:9px;font-size:13.5px;}
+  .mode-btn.active{background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:600;}
+  .control-hint{font-size:12.5px;color:var(--muted);}
+  .drag-hint{font-size:12.5px;color:var(--muted);margin-bottom:10px;text-align:center;}
+
+  .teams-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;}
+  .team-card{border:1px solid var(--panel-border);border-radius:12px;overflow:hidden;min-height:140px;display:flex;flex-direction:column;background:var(--panel);}
+  .team-header{padding:9px 12px;font-family:'Oswald',sans-serif;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center;background:var(--panel-border);color:var(--text);gap:6px;}
+  .team-count{font-family:'JetBrains Mono',monospace;font-size:12px;opacity:.85;}
+  .team-body{padding:10px;display:flex;flex-direction:column;gap:6px;flex:1;}
+  .team-empty{color:#5C7285;font-size:13px;text-align:center;padding:10px 0;}
+  .student-chip{background:rgba(255,255,255,.06);border-radius:7px;padding:8px 10px;font-size:13.5px;cursor:grab;user-select:none;touch-action:none;display:flex;flex-direction:column;gap:4px;}
+  .student-chip.dragging{opacity:.35;}
+  .chip-stars{font-size:10px;color:#D9A427;}
+  .chip-stars .dim{color:#3A3320;}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ===== SportUp — eigenständige Version für GitHub Pages ===== */
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+const STORAGE_KEY = "teamteiler-classes";
+
+// ---- State ----
+let state = {
+  classes: [],
+  activeClassId: null,
+  view: "home", // home | class | generate | pick | tournament
+  classSubview: "roster", // roster | rules
+  newName: "",
+  newSkill: 3,
+  bulkMode: false,
+  bulkText: "",
+  editingClassName: false,
+  showClassPicker: false,
+  numTeams: 4,
+  studentsPerTeam: 4,
+  sizeMode: "teams", // teams | perTeam
+  mode: "balanced", // random | balanced | stacked
+  teams: null,
+  teamsWarning: null,
+  editingTeamId: null,
+  excluded: {}, // studentId -> true
+  pickCount: 3,
+  pickNoRepeat: true,
+  pickedIds: {},
+  pickResult: null,
+  tourFormat: "roundrobin", // roundrobin | knockout | groupsKnockout | doubleElim | groupsDoubleElim | swiss | swissKnockout
+  tourFields: 1,
+  tourGroupsCount: 2,
+  tourGroupsAdvance: 2,
+  tourDeFinalMode: "single", // single | reset
+  tourSwissRoundsMode: "auto", // auto | manual
+  tourSwissRoundsManual: 3,
+  tourSwissQualifiers: 4,
+  tourReturnLeg: false,
+};
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data && data.classes) {
+        state.classes = data.classes;
+        state.activeClassId = data.activeClassId || (data.classes[0] && data.classes[0].id) || null;
+      }
+    }
+  } catch (e) {
+    console.warn("Konnte gespeicherte Klassen nicht laden:", e);
+  }
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ classes: state.classes, activeClassId: state.activeClassId }));
+  } catch (e) {
+    console.warn("Konnte Klassen nicht speichern:", e);
+  }
+}
+
+function getActiveClass() {
+  return state.classes.find(c => c.id === state.activeClassId) || null;
+}
+
+// ---- Actions ----
+function createClass() {
+  const c = { id: uid(), name: `Klasse ${state.classes.length + 1}`, students: [], rules: { together: [], apart: [] } };
+  state.classes.push(c);
+  state.activeClassId = c.id;
+  state.view = "class";
+  state.classSubview = "roster";
+  state.showClassPicker = false;
+  saveState();
+  render();
+}
+
+function deleteClass(id) {
+  state.classes = state.classes.filter(c => c.id !== id);
+  if (state.activeClassId === id) {
+    state.activeClassId = state.classes[0] ? state.classes[0].id : null;
+    state.teams = null;
+  }
+  saveState();
+  render();
+}
+
+function renameActiveClass(name) {
+  const c = getActiveClass();
+  if (c) c.name = name;
+  saveState();
+  render();
+}
+
+function addStudent() {
+  const name = state.newName.trim();
+  const c = getActiveClass();
+  if (!name || !c) return;
+  c.students.push({ id: uid(), name, skill: state.newSkill });
+  state.newName = "";
+  state.newSkill = 3;
+  saveState();
+  render();
+}
+
+function addBulkStudents() {
+  const c = getActiveClass();
+  if (!c) return;
+  const names = state.bulkText
+    .split(/[\n,]+/)
+    .map(n => n.trim())
+    .filter(n => n.length > 0);
+  if (names.length === 0) return;
+  names.forEach(name => c.students.push({ id: uid(), name, skill: 3 }));
+  state.bulkText = "";
+  saveState();
+  render();
+}
+
+function removeStudent(id) {
+  const c = getActiveClass();
+  if (!c) return;
+  c.students = c.students.filter(s => s.id !== id);
+  delete state.excluded[id];
+  saveState();
+  render();
+}
+
+function updateStudentSkill(id, skill) {
+  const c = getActiveClass();
+  if (!c) return;
+  const s = c.students.find(s => s.id === id);
+  if (s) s.skill = skill;
+  saveState();
+  render();
+}
+
+function toggleExcluded(id) {
+  state.excluded[id] = !state.excluded[id];
+  render();
+}
+
+function addRule(type, idA, idB) {
+  if (!idA || !idB || idA === idB) return;
+  const c = getActiveClass();
+  if (!c) return;
+  if (!c.rules) c.rules = { together: [], apart: [] };
+  const list = c.rules[type];
+  const exists = list.some(([a, b]) => (a === idA && b === idB) || (a === idB && b === idA));
+  if (!exists) list.push([idA, idB]);
+  saveState();
+  render();
+}
+
+function removeRule(type, index) {
+  const c = getActiveClass();
+  if (!c || !c.rules) return;
+  c.rules[type].splice(index, 1);
+  saveState();
+  render();
+}
+
+function pickRandom() {
+  const c = getActiveClass();
+  if (!c) return;
+  const present = c.students.filter(s => !state.excluded[s.id]);
+  let candidates = state.pickNoRepeat ? present.filter(s => !state.pickedIds[s.id]) : present;
+  if (state.pickNoRepeat && candidates.length < state.pickCount) {
+    // Nicht mehr genug übrig — Runde ist durch, alle wieder zulassen
+    state.pickedIds = {};
+    candidates = present;
+  }
+  const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+  const picked = shuffled.slice(0, Math.min(state.pickCount, shuffled.length));
+  picked.forEach(s => { state.pickedIds[s.id] = true; });
+  state.pickResult = picked;
+  render();
+}
+
+function resetPicked() {
+  state.pickedIds = {};
+  state.pickResult = null;
+  render();
+}
+
+// ---- Turnier ----
+
+function buildUnits(pool, togetherPairs) {
+  const parent = {};
+  pool.forEach(s => { parent[s.id] = s.id; });
+  function find(x) { while (parent[x] !== x) x = parent[x]; return x; }
+  function union(a, b) { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; }
+  togetherPairs.forEach(([a, b]) => {
+    if (parent[a] !== undefined && parent[b] !== undefined) union(a, b);
+  });
+  const groups = {};
+  pool.forEach(s => {
+    const root = find(s.id);
+    (groups[root] = groups[root] || []).push(s);
+  });
+  return Object.values(groups).map(students => ({
+    ids: students.map(s => s.id),
+    students,
+    skill: students.reduce((sum, s) => sum + s.skill, 0) / students.length,
+  }));
+}
+
+function generateTeams() {
+  const c = getActiveClass();
+  if (!c) return;
+  const rules = c.rules || { together: [], apart: [] };
+  const pool = c.students.filter(s => !state.excluded[s.id]);
+  const poolIds = new Set(pool.map(s => s.id));
+  const togetherPairs = rules.together.filter(([a, b]) => poolIds.has(a) && poolIds.has(b));
+  const apartPairs = rules.apart.filter(([a, b]) => poolIds.has(a) && poolIds.has(b));
+
+  const desiredTeams = state.sizeMode === "perTeam"
+    ? Math.max(2, Math.ceil((pool.length || 1) / state.studentsPerTeam))
+    : state.numTeams;
+  const n = Math.max(2, Math.min(desiredTeams, pool.length || 2));
+  const slots = Array.from({ length: n }, (_, i) => ({ id: i, name: `Team ${i + 1}`, students: [] }));
+
+  const units = buildUnits(pool, togetherPairs);
+
+  if (state.mode === "random") {
+    const shuffled = [...units].sort(() => Math.random() - 0.5);
+    shuffled.forEach(u => {
+      const target = slots.reduce((min, s) => (s.students.length < min.students.length ? s : min), slots[0]);
+      target.students.push(...u.students);
+    });
+  } else if (state.mode === "balanced") {
+    const sorted = [...units].sort((a, b) => b.skill - a.skill);
+    let i = 0, dir = 1;
+    for (const u of sorted) {
+      slots[i].students.push(...u.students);
+      if (dir === 1 && i === n - 1) dir = -1;
+      else if (dir === -1 && i === 0) dir = 1;
+      else i += dir;
+    }
+  } else if (state.mode === "stacked") {
+    const sorted = [...units].sort((a, b) => b.skill - a.skill);
+    const base = Math.floor(pool.length / n);
+    const extra = pool.length % n;
+    let slotIdx = 0;
+    let capacity = base + (slotIdx < extra ? 1 : 0);
+    sorted.forEach(u => {
+      if (slots[slotIdx].students.length >= capacity && slotIdx < n - 1) {
+        slotIdx++;
+        capacity = base + (slotIdx < extra ? 1 : 0);
+      }
+      slots[slotIdx].students.push(...u.students);
+    });
+  }
+
+  const idToUnit = {};
+  units.forEach(u => u.ids.forEach(id => { idToUnit[id] = u; }));
+
+  function slotMap() {
+    const map = {};
+    slots.forEach(s => s.students.forEach(st => { map[st.id] = s; }));
+    return map;
+  }
+
+  for (let pass = 0; pass < 6; pass++) {
+    const slotOf = slotMap();
+    let changed = false;
+    for (const [a, b] of apartPairs) {
+      if (!slotOf[a] || !slotOf[b] || slotOf[a] !== slotOf[b]) continue;
+      const unitB = idToUnit[b];
+      const currentSlot = slotOf[b];
+      const candidates = slots
+        .filter(s => s !== currentSlot)
+        .sort((x, y) => x.students.length - y.students.length);
+      for (const cand of candidates) {
+        const conflict = unitB.ids.some(uid2 =>
+          cand.students.some(st =>
+            apartPairs.some(([x, y]) => (x === uid2 && y === st.id) || (y === uid2 && x === st.id))
+          )
+        );
+        if (!conflict) {
+          currentSlot.students = currentSlot.students.filter(st => !unitB.ids.includes(st.id));
+          cand.students.push(...unitB.students);
+          changed = true;
+          break;
+        }
+      }
+    }
+    if (!changed) break;
+  }
+
+  const finalSlotOf = slotMap();
+  const stillViolated = apartPairs.filter(([a, b]) => finalSlotOf[a] && finalSlotOf[b] && finalSlotOf[a] === finalSlotOf[b]).length;
+  state.teamsWarning = stillViolated > 0
+    ? `${stillViolated} "Nie zusammen"-Regel(n) konnten nicht eingehalten werden — zu viele Einschränkungen gleichzeitig.`
+    : null;
+
+  state.teams = slots;
+  render();
+}
+
+function renameTeam(teamId, name) {
+  if (!state.teams) return;
+  const team = state.teams.find(t => t.id === teamId);
+  if (team) team.name = name.trim() || `Team ${teamId + 1}`;
+  render();
+}
+
+// ---- Drag & drop (pointer-based, touch + mouse) ----
+let dragState = null;
+
+function onPointerDownStudent(e, studentId, fromTeam) {
+  e.currentTarget.setPointerCapture && e.currentTarget.setPointerCapture(e.pointerId);
+  dragState = { studentId, fromTeam, pointerId: e.pointerId };
+  render();
+}
+
+function onPointerUp(e) {
+  if (!dragState) return;
+  const { studentId, fromTeam } = dragState;
+  const elAt = document.elementFromPoint(e.clientX, e.clientY);
+  const teamEl = elAt && elAt.closest ? elAt.closest("[data-team-id]") : null;
+  if (teamEl) {
+    const toTeam = parseInt(teamEl.getAttribute("data-team-id"), 10);
+    if (toTeam !== fromTeam && state.teams) {
+      const fromSlot = state.teams.find(t => t.id === fromTeam);
+      const toSlot = state.teams.find(t => t.id === toTeam);
+      const sIdx = fromSlot.students.findIndex(s => s.id === studentId);
+      if (sIdx > -1) {
+        const [student] = fromSlot.students.splice(sIdx, 1);
+        toSlot.students.push(student);
+      }
+    }
+  }
+  dragState = null;
+  render();
+}
+document.addEventListener("pointerup", onPointerUp);
+
+// ---- Rendering ----
+function el(tag, attrs = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") node.className = v;
+    else if (k.startsWith("on") && typeof v === "function") node.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k === "html") node.innerHTML = v;
+    else if (v !== null && v !== undefined) node.setAttribute(k, v);
+  }
+  (Array.isArray(children) ? children : [children]).forEach(child => {
+    if (child === null || child === undefined) return;
+    node.appendChild(typeof child === "string" ? document.createTextNode(child) : child);
+  });
+  return node;
+}
+
+function starsEl(value, size, onPick) {
+  const wrap = el("div", { class: "skill-picker" });
+  for (let n = 1; n <= 5; n++) {
+    const dot = el("button", {
+      class: "skill-dot" + (n <= value ? " filled" : ""),
+      style: `font-size:${size || 13}px`,
+      title: `Level ${n}`,
+      onClick: onPick ? () => onPick(n) : null,
+    }, "★");
+    if (!onPick) dot.style.cursor = "default";
+    wrap.appendChild(dot);
+  }
+  return wrap;
+}
+
+function renderHeader() {
+  const header = el("header");
+  const left = el("div", { class: "header-left" }, [
+    el("div", { class: "logo", html: `<svg width="22" height="22" viewBox="0 0 48 48" fill="none"><circle cx="15" cy="33" r="6.5" fill="white"/><path d="M20 27 L33 14" stroke="white" stroke-width="5" stroke-linecap="round"/><path d="M23 14 H34 V25" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>` }),
+    el("div", {}, [
+      el("div", { class: "app-title" }, "SportUp"),
+      el("div", { class: "app-subtitle" }, "Teams für den Sportunterricht"),
+    ]),
+  ]);
+  header.appendChild(left);
+
+  const wrap = el("div", { class: "class-picker-wrap" });
+  const activeClass = getActiveClass();
+  const btn = el("button", {
+    class: "class-picker-btn",
+    onClick: () => { state.showClassPicker = !state.showClassPicker; render(); },
+  }, `👥 ${activeClass ? activeClass.name : "Keine Klasse"} ▾`);
+  wrap.appendChild(btn);
+
+  const dropdown = el("div", { class: "class-dropdown" + (state.showClassPicker ? " open" : "") });
+  state.classes.forEach(c => {
+    const item = el("div", { class: "class-dropdown-item", style: c.id === state.activeClassId ? "background:#2A3F4E" : "" });
+    const nameSpan = el("span", { class: "name", onClick: () => {
+      state.activeClassId = c.id;
+      state.teams = null;
+      state.teamsWarning = null;
+      state.pickedIds = {};
+      state.pickResult = null;
+      state.showClassPicker = false;
+      state.view = "home";
+      saveState();
+      render();
+    } },
+      `${c.name} `);
+    nameSpan.appendChild(el("span", { class: "count" }, `(${c.students.length})`));
+    item.appendChild(nameSpan);
+    item.appendChild(el("button", { class: "icon-btn", title: "Klasse löschen", onClick: () => deleteClass(c.id) }, "🗑"));
+    dropdown.appendChild(item);
+  });
+  dropdown.appendChild(el("div", { class: "class-dropdown-divider" }));
+  dropdown.appendChild(el("button", { class: "new-class-btn", onClick: createClass }, "+ Neue Klasse"));
+  wrap.appendChild(dropdown);
+
+  header.appendChild(wrap);
+  return header;
+}
+
+function renderEmptyState() {
+  return el("div", { class: "empty-state" }, [
+    el("div", { class: "empty-icon" }, "👥"),
+    el("div", { class: "empty-title" }, "Noch keine Klasse angelegt"),
+    el("div", { class: "empty-text" }, "Leg eine Klasse an, um Namen einzutragen und danach Teams zu bilden."),
+    el("button", { class: "btn-primary", onClick: createClass }, "+ Erste Klasse anlegen"),
+  ]);
+}
+
+function renderSubHeader(activeClass) {
+  const wrap = el("div", { class: "sub-header" });
+  const nameRow = el("div", { class: "class-name-row" });
+  if (state.editingClassName) {
+    const input = el("input", { class: "class-name-input", value: activeClass.name });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        renameActiveClass(input.value.trim() || activeClass.name);
+        state.editingClassName = false;
+        render();
+      }
+    });
+    nameRow.appendChild(input);
+    nameRow.appendChild(el("button", { class: "icon-btn", onClick: () => {
+      renameActiveClass(input.value.trim() || activeClass.name);
+      state.editingClassName = false;
+      render();
+    } }, "✓"));
+    setTimeout(() => input.focus(), 0);
+  } else {
+    nameRow.appendChild(el("h1", { class: "class-name" }, activeClass.name));
+    nameRow.appendChild(el("button", { class: "icon-btn", onClick: () => { state.editingClassName = true; render(); } }, "✎"));
+  }
+  wrap.appendChild(nameRow);
+
+  if (state.view !== "home") {
+    wrap.appendChild(el("button", { class: "back-btn", onClick: () => { state.view = "home"; render(); } }, "← Übersicht"));
+  }
+
+  if (state.view === "class") {
+    const tabs = el("div", { class: "tab-row" }, [
+      el("button", { class: "tab" + (state.classSubview === "roster" ? " active" : ""), onClick: () => { state.classSubview = "roster"; render(); } }, "Schüler:innen"),
+      el("button", { class: "tab" + (state.classSubview === "rules" ? " active" : ""), onClick: () => { state.classSubview = "rules"; render(); } }, "Regeln"),
+    ]);
+    wrap.appendChild(tabs);
+  }
+  return wrap;
+}
+
+function renderHomeView(activeClass) {
+  const wrap = el("div", { class: "content" });
+  const cards = [
+    { key: "class", icon: "👥", title: "Klasse", subtitle: "Schüler:innen & Regeln", onClick: () => { state.view = "class"; state.classSubview = "roster"; } },
+    { key: "generate", icon: "🔀", title: "Teams erstellen", subtitle: "Teams bilden & verschieben", onClick: () => { state.view = "generate"; } },
+    { key: "pick", icon: "🎲", title: "Zufallsauswahl", subtitle: "Für Aufgaben & Präsentationen", onClick: () => { state.view = "pick"; } },
+    { key: "tournament", icon: "🏆", title: "Turnier erstellen", subtitle: "Spielplan & Tabelle", onClick: () => { state.view = "tournament"; } },
+  ];
+  const grid = el("div", { class: "home-grid" });
+  cards.forEach(c => {
+    const card = el("button", { class: "home-card", onClick: () => { c.onClick(); render(); } }, [
+      el("span", { class: "home-card-icon" }, c.icon),
+      el("span", { class: "home-card-title" }, c.title),
+      el("span", { class: "home-card-subtitle" }, c.subtitle),
+    ]);
+    grid.appendChild(card);
+  });
+  wrap.appendChild(grid);
+  wrap.appendChild(el("div", { class: "control-hint", style: "margin-top:16px;text-align:center" }, `Klasse: ${activeClass.name} · ${activeClass.students.length} Schüler:in${activeClass.students.length === 1 ? "" : "nen"}`));
+  return wrap;
+}
+
+function renderRosterView(activeClass) {
+  const wrap = el("div", { class: "content" });
+
+  const toggleRow = el("div", { class: "mode-row", style: "margin-bottom:12px" }, [
+    el("button", { class: "mode-btn" + (!state.bulkMode ? " active" : ""), onClick: () => { state.bulkMode = false; render(); } }, "Einzeln"),
+    el("button", { class: "mode-btn" + (state.bulkMode ? " active" : ""), onClick: () => { state.bulkMode = true; render(); } }, "Mehrere auf einmal"),
+  ]);
+  wrap.appendChild(toggleRow);
+
+  if (state.bulkMode) {
+    const textarea = el("textarea", {
+      class: "text-input",
+      style: "width:100%;min-height:120px;resize:vertical;font-family:inherit;",
+      placeholder: "Ein Name pro Zeile …\nz. B.\nAnna Meier\nBen Schulz\nClara Vogel",
+    });
+    textarea.value = state.bulkText;
+    textarea.addEventListener("input", (e) => { state.bulkText = e.target.value; });
+    wrap.appendChild(textarea);
+
+    const addRow = el("div", { class: "add-row", style: "margin-top:10px" });
+    const addBtn = el("button", { class: "btn-primary-sm", onClick: () => { addBulkStudents(); } }, "+ Alle hinzufügen");
+    addRow.appendChild(addBtn);
+    wrap.appendChild(addRow);
+    wrap.appendChild(el("div", { class: "control-hint", style: "margin-top:6px" }, "Alle bekommen erstmal Skill-Level 3 — danach einzeln anpassbar."));
+  } else {
+    const addRow = el("div", { class: "add-row" });
+    const nameInput = el("input", { class: "text-input", placeholder: "Name eintragen …", value: state.newName });
+    nameInput.addEventListener("input", (e) => { state.newName = e.target.value; });
+    nameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addStudent(); });
+    addRow.appendChild(nameInput);
+    addRow.appendChild(starsEl(state.newSkill, 15, (n) => { state.newSkill = n; render(); setTimeout(() => nameInput.focus(), 0); }));
+    addRow.appendChild(el("button", { class: "btn-primary-sm", onClick: addStudent }, "+ Hinzufügen"));
+    wrap.appendChild(addRow);
+  }
+
+  if (activeClass.students.length === 0) {
+    wrap.appendChild(el("div", { class: "empty-roster" }, "Noch keine Schüler:innen eingetragen."));
+  } else {
+    const list = el("div", { class: "roster-list" });
+    activeClass.students.forEach(s => {
+      const row = el("div", { class: "roster-row" });
+      row.appendChild(el("span", { class: "roster-name" + (state.excluded[s.id] ? " excluded" : "") }, s.name));
+      row.appendChild(starsEl(s.skill, 13, (n) => updateStudentSkill(s.id, n)));
+      row.appendChild(el("button", {
+        class: "chip-btn" + (state.excluded[s.id] ? " active" : ""),
+        title: "Für heute ausschließen",
+        onClick: () => toggleExcluded(s.id),
+      }, state.excluded[s.id] ? "fehlt" : "dabei"));
+      row.appendChild(el("button", { class: "icon-btn", onClick: () => removeStudent(s.id) }, "✕"));
+      list.appendChild(row);
+    });
+    wrap.appendChild(list);
+  }
+
+  const excludedCount = Object.values(state.excluded).filter(Boolean).length;
+  wrap.appendChild(el("div", { class: "roster-footer" },
+    `${activeClass.students.length} Schüler:in${activeClass.students.length === 1 ? "" : "nen"} insgesamt` +
+    (excludedCount > 0 ? ` · ${excludedCount} heute ausgeschlossen` : "")
+  ));
+
+  return wrap;
+}
+
+function renderRulesView(activeClass) {
+  const wrap = el("div", { class: "content" });
+  if (!activeClass.rules) activeClass.rules = { together: [], apart: [] };
+  const students = activeClass.students;
+
+  function nameOf(id) {
+    const s = students.find(s => s.id === id);
+    return s ? s.name : "?";
+  }
+
+  function section(title, type, emptyHint, symbol) {
+    const box = el("div", { class: "control-panel" });
+    box.appendChild(el("label", { class: "control-label" }, title));
+
+    if (students.length < 2) {
+      box.appendChild(el("div", { class: "empty-roster" }, "Trag zuerst mindestens zwei Schüler:innen ein."));
+      return box;
+    }
+
+    const selA = el("select", { class: "text-input" });
+    const selB = el("select", { class: "text-input" });
+    [selA, selB].forEach(sel => {
+      sel.appendChild(el("option", { value: "" }, "Schüler:in wählen …"));
+      students.forEach(s => sel.appendChild(el("option", { value: s.id }, s.name)));
+    });
+    const row = el("div", { class: "add-row" }, [
+      selA,
+      selB,
+      el("button", { class: "btn-primary-sm", onClick: () => addRule(type, selA.value, selB.value) }, "+ Hinzufügen"),
+    ]);
+    box.appendChild(row);
+
+    const list = activeClass.rules[type];
+    if (list.length === 0) {
+      box.appendChild(el("div", { class: "empty-roster" }, emptyHint));
+    } else {
+      const listWrap = el("div", { class: "roster-list" });
+      list.forEach(([a, b], idx) => {
+        const rowEl = el("div", { class: "roster-row" });
+        rowEl.appendChild(el("span", { class: "roster-name" }, `${nameOf(a)}  ${symbol}  ${nameOf(b)}`));
+        rowEl.appendChild(el("button", { class: "icon-btn", onClick: () => removeRule(type, idx) }, "✕"));
+        listWrap.appendChild(rowEl);
+      });
+      box.appendChild(listWrap);
+    }
+    return box;
+  }
+
+  wrap.appendChild(section("🤝 Immer zusammen", "together", "Noch keine Regel — z. B. wenn zwei sich gut ergänzen sollen.", "🤝"));
+  wrap.appendChild(section("🚫 Nie zusammen", "apart", "Noch keine Regel — z. B. um Streit zu vermeiden.", "🚫"));
+
+  return wrap;
+}
+
+function renderPickView(activeClass) {
+  const wrap = el("div", { class: "content" });
+  const present = activeClass.students.filter(s => !state.excluded[s.id]);
+
+  const panel = el("div", { class: "control-panel" });
+  panel.appendChild(el("div", {}, [
+    el("label", { class: "control-label" }, "Wie viele auswählen"),
+    el("div", { class: "stepper" }, [
+      el("button", { class: "stepper-btn", onClick: () => { state.pickCount = Math.max(1, state.pickCount - 1); render(); } }, "−"),
+      el("span", { class: "stepper-value" }, String(state.pickCount)),
+      el("button", { class: "stepper-btn", onClick: () => { state.pickCount = Math.min(Math.max(present.length, 1), state.pickCount + 1); render(); } }, "+"),
+    ]),
+  ]));
+
+  panel.appendChild(el("div", { class: "mode-row" }, [
+    el("button", {
+      class: "mode-btn" + (state.pickNoRepeat ? " active" : ""),
+      onClick: () => { state.pickNoRepeat = !state.pickNoRepeat; render(); },
+    }, state.pickNoRepeat ? "✓ Ohne Wiederholung, bis alle dran waren" : "Wiederholung möglich"),
+  ]));
+
+  const btnRow = el("div", { class: "add-row" });
+  const pickBtn = el("button", { class: "btn-primary", onClick: pickRandom }, "🎲 Auswählen");
+  if (present.length === 0) pickBtn.setAttribute("disabled", "disabled");
+  btnRow.appendChild(pickBtn);
+  if (state.pickNoRepeat) {
+    btnRow.appendChild(el("button", { class: "btn-primary-sm", onClick: resetPicked }, "↺ Zurücksetzen"));
+  }
+  panel.appendChild(btnRow);
+
+  const remaining = present.filter(s => !state.pickedIds[s.id]).length;
+  panel.appendChild(el("div", { class: "control-hint" },
+    `${present.length} anwesend` + (state.pickNoRepeat ? ` · ${remaining} noch nicht dran gewesen` : "")
+  ));
+
+  wrap.appendChild(panel);
+
+  if (state.pickResult && state.pickResult.length > 0) {
+    const card = el("div", { class: "team-card", style: "max-width:340px" });
+    card.appendChild(el("div", { class: "team-header" }, [
+      document.createTextNode("Ausgewählt"),
+      el("span", { class: "team-count" }, String(state.pickResult.length)),
+    ]));
+    const body = el("div", { class: "team-body" });
+    state.pickResult.forEach(s => {
+      body.appendChild(el("div", { class: "student-chip" }, el("span", {}, s.name)));
+    });
+    card.appendChild(body);
+    wrap.appendChild(card);
+  }
+
+  return wrap;
+}
+
+function renderGenerateView(activeClass) {
+  const wrap = el("div", { class: "content" });
+  const activeCount = activeClass.students.filter(s => !state.excluded[s.id]).length;
+
+  const panel = el("div", { class: "control-panel" });
+
+  const sizeModeGroup = el("div", {}, [
+    el("label", { class: "control-label" }, "Einstellen nach"),
+    el("div", { class: "mode-row" }, [
+      el("button", { class: "mode-btn" + (state.sizeMode === "teams" ? " active" : ""), onClick: () => { state.sizeMode = "teams"; render(); } }, "Anzahl Teams"),
+      el("button", { class: "mode-btn" + (state.sizeMode === "perTeam" ? " active" : ""), onClick: () => { state.sizeMode = "perTeam"; render(); } }, "Spieler pro Team"),
+    ]),
+  ]);
+  panel.appendChild(sizeModeGroup);
+
+  const teamsGroup = state.sizeMode === "teams"
+    ? el("div", {}, [
+        el("label", { class: "control-label" }, "Anzahl Teams"),
+        el("div", { class: "stepper" }, [
+          el("button", { class: "stepper-btn", onClick: () => { state.numTeams = Math.max(2, state.numTeams - 1); render(); } }, "−"),
+          el("span", { class: "stepper-value" }, String(state.numTeams)),
+          el("button", { class: "stepper-btn", onClick: () => { state.numTeams = state.numTeams + 1; render(); } }, "+"),
+        ]),
+      ])
+    : el("div", {}, [
+        el("label", { class: "control-label" }, "Spieler pro Team"),
+        el("div", { class: "stepper" }, [
+          el("button", { class: "stepper-btn", onClick: () => { state.studentsPerTeam = Math.max(2, state.studentsPerTeam - 1); render(); } }, "−"),
+          el("span", { class: "stepper-value" }, String(state.studentsPerTeam)),
+          el("button", { class: "stepper-btn", onClick: () => { state.studentsPerTeam = Math.min(20, state.studentsPerTeam + 1); render(); } }, "+"),
+        ]),
+      ]);
+  panel.appendChild(teamsGroup);
+
+  const modeGroup = el("div", {}, [
+    el("label", { class: "control-label" }, "Aufteilung"),
+    el("div", { class: "mode-row" }, [
+      el("button", { class: "mode-btn" + (state.mode === "random" ? " active" : ""), onClick: () => { state.mode = "random"; render(); } }, "🔀 Zufällig"),
+      el("button", { class: "mode-btn" + (state.mode === "balanced" ? " active" : ""), onClick: () => { state.mode = "balanced"; render(); } }, "⚖️ Ausgeglichen"),
+      el("button", { class: "mode-btn" + (state.mode === "stacked" ? " active" : ""), onClick: () => { state.mode = "stacked"; render(); } }, "★ Starke zusammen"),
+    ]),
+  ]);
+  panel.appendChild(modeGroup);
+
+  const genBtn = el("button", { class: "btn-primary", onClick: generateTeams }, "🔀 Teams erstellen");
+  if (activeCount < 2) genBtn.setAttribute("disabled", "disabled");
+  panel.appendChild(genBtn);
+
+  panel.appendChild(el("div", { class: "control-hint" },
+    `${activeCount} von ${activeClass.students.length} dabei` +
+    (activeClass.students.length > 0 && activeCount !== activeClass.students.length ? ` — Anwesenheit im Reiter "Schüler:innen" anpassen` : "") +
+    (state.sizeMode === "perTeam" && activeCount > 0 ? ` · ergibt ${Math.max(2, Math.ceil(activeCount / state.studentsPerTeam))} Teams` : "")
+  ));
+
+  wrap.appendChild(panel);
+
+  if (state.teams) {
+    if (state.teamsWarning) {
+      wrap.appendChild(el("div", { class: "control-hint", style: "color:#E8A798;margin-bottom:8px" }, `⚠️ ${state.teamsWarning}`));
+    }
+    wrap.appendChild(el("div", { class: "drag-hint" }, "Tippen, halten und auf ein anderes Team ziehen, um zu verschieben."));
+    const grid = el("div", { class: "teams-grid" });
+    state.teams.forEach(team => {
+      const card = el("div", { class: "team-card", "data-team-id": String(team.id) });
+      const head = el("div", { class: "team-header" });
+      const nameGroup = el("div", { style: "display:flex;align-items:center;gap:4px;min-width:0" });
+      if (state.editingTeamId === team.id) {
+        const input = el("input", { class: "class-name-input", style: "font-size:14px;padding:2px 6px;width:100px", value: team.name });
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") { renameTeam(team.id, input.value); state.editingTeamId = null; render(); }
+        });
+        nameGroup.appendChild(input);
+        nameGroup.appendChild(el("button", { class: "icon-btn", style: "color:inherit", onClick: () => { renameTeam(team.id, input.value); state.editingTeamId = null; render(); } }, "✓"));
+        setTimeout(() => input.focus(), 0);
+      } else {
+        nameGroup.appendChild(el("span", { style: "overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, team.name));
+        nameGroup.appendChild(el("button", { class: "icon-btn", style: "color:inherit", onClick: () => { state.editingTeamId = team.id; render(); } }, "✎"));
+      }
+      head.appendChild(nameGroup);
+      head.appendChild(el("span", { class: "team-count" }, String(team.students.length)));
+      card.appendChild(head);
+      const body = el("div", { class: "team-body" });
+      if (team.students.length === 0) {
+        body.appendChild(el("div", { class: "team-empty" }, "—"));
+      }
+      team.students.forEach(s => {
+        const isDragging = dragState && dragState.studentId === s.id;
+        const chip = el("div", { class: "student-chip" + (isDragging ? " dragging" : "") });
+        chip.addEventListener("pointerdown", (e) => onPointerDownStudent(e, s.id, team.id));
+        chip.appendChild(el("span", {}, s.name));
+        const starsSpan = el("span", { class: "chip-stars" });
+        for (let n = 1; n <= 5; n++) starsSpan.appendChild(el("span", { class: n <= s.skill ? "" : "dim" }, "★"));
+        chip.appendChild(starsSpan);
+        body.appendChild(chip);
+      });
+      card.appendChild(body);
+      grid.appendChild(card);
+    });
+    wrap.appendChild(grid);
+  }
+
+  return wrap;
+}
+
+function shuffleArr(arr) { return [...arr].sort(() => Math.random() - 0.5); }
+
+// Baut eine erste K.-o.-Runde aus einer bereits geordneten Liste (beste zuerst).
+// Freilose gehen an die vorderen Plätze, Rest wird "erster gegen letzter" gepaart.
+// Für unges\u00e4te Situationen einfach eine zuf\u00e4llig gemischte Liste \u00fcbergeben.
+function buildFirstKoRound(orderedIds) {
+  let size = 1;
+  while (size < orderedIds.length) size *= 2;
+  const byesNeeded = size - orderedIds.length;
+  const byeTeams = orderedIds.slice(0, byesNeeded);
+  const playTeams = orderedIds.slice(byesNeeded);
+  const matches = [];
+  byeTeams.forEach(t => matches.push({ id: uid(), teamA: t, teamB: null, winner: t, bye: true, scoreA: null, scoreB: null }));
+  let lo = 0, hi = playTeams.length - 1;
+  while (lo < hi) {
+    matches.push({ id: uid(), teamA: playTeams[lo], teamB: playTeams[hi], winner: null, bye: false, scoreA: null, scoreB: null });
+    lo++; hi--;
+  }
+  return matches;
+}
+
+function buildNextKnockoutRound(prevMatches) {
+  const winners = prevMatches.map(m => m.winner);
+  if (winners.length <= 1) return null;
+  const matches = [];
+  for (let i = 0; i < winners.length; i += 2) {
+    matches.push({ id: uid(), teamA: winners[i], teamB: winners[i + 1], winner: null, bye: false, scoreA: null, scoreB: null });
+  }
+  return matches;
+}
+
+function tryAdvanceKnockout(koRounds) {
+  const last = koRounds[koRounds.length - 1];
+  const allDecided = last.every(m => m.winner !== null && m.winner !== undefined);
+  if (!allDecided || last.length <= 1) return;
+  const next = buildNextKnockoutRound(last);
+  if (next) koRounds.push(next);
+}
+
+function updateWinnerFromScore(m) {
+  if (m.scoreA !== null && m.scoreA !== undefined && m.scoreB !== null && m.scoreB !== undefined) {
+    if (m.scoreA > m.scoreB) m.winner = m.teamA;
+    else if (m.scoreB > m.scoreA) m.winner = m.teamB;
+    else m.winner = null;
+  } else {
+    m.winner = null;
+  }
+}
+
+function computeStandings(teamIds, rounds) {
+  const stats = {};
+  teamIds.forEach(id => { stats[id] = { id, wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, points: 0 }; });
+  rounds.forEach(round => round.forEach(m => {
+    if (m.bye || m.teamB == null) return;
+    if (m.scoreA == null || m.scoreB == null) return;
+    if (stats[m.teamA] === undefined || stats[m.teamB] === undefined) return;
+    stats[m.teamA].gf += m.scoreA; stats[m.teamA].ga += m.scoreB;
+    stats[m.teamB].gf += m.scoreB; stats[m.teamB].ga += m.scoreA;
+    if (m.scoreA > m.scoreB) { stats[m.teamA].wins++; stats[m.teamA].points += 3; stats[m.teamB].losses++; }
+    else if (m.scoreB > m.scoreA) { stats[m.teamB].wins++; stats[m.teamB].points += 3; stats[m.teamA].losses++; }
+    else { stats[m.teamA].draws++; stats[m.teamB].draws++; stats[m.teamA].points++; stats[m.teamB].points++; }
+  }));
+  return Object.values(stats).sort((a, b) => b.points - a.points || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+}
+
+function buildRoundRobinRounds(teamIds, fieldsCount, withReturnLeg) {
+  const pairs = [];
+  for (let i = 0; i < teamIds.length; i++) {
+    for (let j = i + 1; j < teamIds.length; j++) pairs.push([teamIds[i], teamIds[j]]);
+  }
+  pairs.sort(() => Math.random() - 0.5);
+  const rounds = [];
+  for (let i = 0; i < pairs.length; i += fieldsCount) {
+    rounds.push(pairs.slice(i, i + fieldsCount).map(([a, b]) => ({ id: uid(), teamA: a, teamB: b, winner: null, bye: false, scoreA: null, scoreB: null, leg: 1 })));
+  }
+  if (withReturnLeg) {
+    const returnPairs = pairs.map(([a, b]) => [b, a]).sort(() => Math.random() - 0.5);
+    for (let i = 0; i < returnPairs.length; i += fieldsCount) {
+      rounds.push(returnPairs.slice(i, i + fieldsCount).map(([a, b]) => ({ id: uid(), teamA: a, teamB: b, winner: null, bye: false, scoreA: null, scoreB: null, leg: 2 })));
+    }
+  }
+  return rounds;
+}
+
+// Verteilt Teams m\u00f6glichst gleichm\u00e4\u00dfig auf `groupsCount` Gruppen.
+function distributeIntoGroups(teamIds, groupsCount) {
+  const g = Math.max(1, Math.min(groupsCount, Math.floor(teamIds.length / 2) || 1));
+  const shuffled = shuffleArr(teamIds);
+  const groups = Array.from({ length: g }, () => []);
+  shuffled.forEach((id, idx) => groups[idx % g].push(id));
+  return groups.map(ids => ({ teamIds: ids, rounds: null })); // rounds gesetzt vom Aufrufer
+}
+
+// Baut aus den Gruppen-Tabellen eine ges\u00e4te Qualifikanten-Liste (beste zuerst),
+// abwechselnd nach Platzierung \u00fcber die Gruppen hinweg (1. aus jeder Gruppe, dann 2. usw.)
+function rankedQualifiers(groups, advanceCount) {
+  const standingsPerGroup = groups.map(g => computeStandings(g.teamIds, g.rounds));
+  const qualifiers = [];
+  for (let rank = 0; rank < advanceCount; rank++) {
+    standingsPerGroup.forEach(standings => {
+      if (standings[rank]) qualifiers.push(standings[rank].id);
+    });
+  }
+  return qualifiers;
+}
+
+// ---- Doppel-K.-o. ----
+function roundLosers(round) {
+  return round.filter(m => !m.bye).map(m => (m.winner === m.teamA ? m.teamB : m.teamA));
+}
+
+function pairUp(list) {
+  const matches = [];
+  let i = 0;
+  for (; i + 1 < list.length; i += 2) {
+    matches.push({ id: uid(), teamA: list[i], teamB: list[i + 1], winner: null, bye: false, scoreA: null, scoreB: null });
+  }
+  if (list.length % 2 === 1) {
+    const leftover = list[list.length - 1];
+    matches.push({ id: uid(), teamA: leftover, teamB: null, winner: leftover, bye: true, scoreA: null, scoreB: null });
+  }
+  return matches;
+}
+
+function pairAcross(listA, listB) {
+  const matches = [];
+  const n = Math.min(listA.length, listB.length);
+  for (let i = 0; i < n; i++) {
+    matches.push({ id: uid(), teamA: listA[i], teamB: listB[i], winner: null, bye: false, scoreA: null, scoreB: null });
+  }
+  for (let i = n; i < listA.length; i++) matches.push({ id: uid(), teamA: listA[i], teamB: null, winner: listA[i], bye: true, scoreA: null, scoreB: null });
+  for (let i = n; i < listB.length; i++) matches.push({ id: uid(), teamA: listB[i], teamB: null, winner: listB[i], bye: true, scoreA: null, scoreB: null });
+  return matches;
+}
+
+function initDoubleElim(orderedOrShuffledIds, finalMode) {
+  let size = 1;
+  let r = 0;
+  while (size < orderedOrShuffledIds.length) { size *= 2; r++; }
+  r = Math.max(r, 1);
+  return {
+    wbRounds: [buildFirstKoRound(orderedOrShuffledIds)],
+    wbTotalRounds: r,
+    lbRounds: [],
+    grandFinal: null,
+    bracketReset: null,
+    finalMode: finalMode, // "single" | "reset"
+    champion: null,
+  };
+}
+
+function allDecided(round) { return round.every(m => m.winner !== null && m.winner !== undefined); }
+
+function advanceDoubleElim(de) {
+  const R = de.wbTotalRounds;
+
+  // Winner-Bracket weiterschalten
+  const lastWb = de.wbRounds[de.wbRounds.length - 1];
+  if (allDecided(lastWb) && lastWb.length > 1) {
+    const next = buildNextKnockoutRound(lastWb);
+    if (next) de.wbRounds.push(next);
+  }
+
+  // Verlierer-Bracket weiterschalten
+  const totalLbRounds = 2 * (R - 1);
+  const i = de.lbRounds.length + 1;
+  if (i <= totalLbRounds) {
+    if (i === 1) {
+      if (de.wbRounds.length >= 1 && allDecided(de.wbRounds[0])) {
+        const losers = roundLosers(de.wbRounds[0]);
+        if (losers.length >= 1) de.lbRounds.push(pairUp(losers));
+      }
+    } else if (i % 2 === 0) {
+      // Drop-down-Runde: Sieger der letzten LB-Runde vs. Verlierer der n\u00e4chsten WB-Runde
+      const prevLb = de.lbRounds[i - 2];
+      const wbRoundIdx = i / 2; // 1-basiert: WB-Runde (i/2 + 1) -> Array-Index i/2
+      if (prevLb && allDecided(prevLb) && de.wbRounds.length > wbRoundIdx && allDecided(de.wbRounds[wbRoundIdx])) {
+        const survivors = prevLb.map(m => m.winner);
+        const droppers = roundLosers(de.wbRounds[wbRoundIdx]);
+        de.lbRounds.push(pairAcross(survivors, droppers));
+      }
+    } else {
+      // Konsolidierungsrunde: Sieger der letzten Drop-down-Runde spielen gegeneinander
+      const prevLb = de.lbRounds[i - 2];
+      if (prevLb && allDecided(prevLb)) {
+        const survivors = prevLb.map(m => m.winner);
+        de.lbRounds.push(pairUp(survivors));
+      }
+    }
+  }
+
+  // Grand Final ansetzen, sobald beide Brackets fertig sind
+  const wbDone = de.wbRounds.length === R && allDecided(de.wbRounds[R - 1]) && de.wbRounds[R - 1].length === 1;
+  const lbDone = totalLbRounds === 0
+    ? (de.wbRounds.length >= 1 && allDecided(de.wbRounds[0]))
+    : (de.lbRounds.length === totalLbRounds && allDecided(de.lbRounds[totalLbRounds - 1]));
+
+  if (wbDone && lbDone && !de.grandFinal) {
+    const wbChampion = de.wbRounds[R - 1][0].winner;
+    const lbChampion = totalLbRounds === 0
+      ? roundLosers(de.wbRounds[0])[0] // Sonderfall: nur 2 Teams insgesamt
+      : de.lbRounds[totalLbRounds - 1][0].winner;
+    if (wbChampion != null && lbChampion != null) {
+      de.grandFinal = { teamA: wbChampion, teamB: lbChampion, winner: null, bye: false, scoreA: null, scoreB: null, id: uid() };
+    }
+  }
+
+  // Bracket-Reset (2. Finale), falls gew\u00fcnscht und n\u00f6tig
+  if (de.grandFinal && de.grandFinal.winner != null && de.finalMode === "reset" && !de.bracketReset) {
+    const wbChampion = de.wbRounds[R - 1][0].winner;
+    if (de.grandFinal.winner !== wbChampion) {
+      de.bracketReset = { teamA: de.grandFinal.teamA, teamB: de.grandFinal.teamB, winner: null, bye: false, scoreA: null, scoreB: null, id: uid() };
+    }
+  }
+
+  // Champion bestimmen
+  if (de.bracketReset) {
+    de.champion = de.bracketReset.winner;
+  } else if (de.grandFinal && de.grandFinal.winner != null) {
+    de.champion = de.grandFinal.winner;
+  }
+}
+
+// ---- Schweizer System ----
+function autoSwissRounds(n) {
+  if (n <= 2) return 1;
+  return Math.max(3, Math.min(n - 1, Math.ceil(Math.log2(n)) + 1));
+}
+
+function buildSwissRound(teamIds, previousRounds) {
+  const stats = computeStandings(teamIds, previousRounds);
+  const played = new Set();
+  previousRounds.forEach(round => round.forEach(m => {
+    if (!m.bye && m.teamB != null) { played.add(m.teamA + "-" + m.teamB); played.add(m.teamB + "-" + m.teamA); }
+  }));
+  const hadBye = new Set(previousRounds.flat().filter(m => m.bye).map(m => m.teamA));
+  const order = stats.map(s => s.id);
+  const available = [...order];
+  const matches = [];
+
+  if (available.length % 2 === 1) {
+    let byeIdx = -1;
+    for (let i = available.length - 1; i >= 0; i--) {
+      if (!hadBye.has(available[i])) { byeIdx = i; break; }
+    }
+    if (byeIdx === -1) byeIdx = available.length - 1;
+    const byeTeam = available.splice(byeIdx, 1)[0];
+    matches.push({ id: uid(), teamA: byeTeam, teamB: null, winner: byeTeam, bye: true, scoreA: null, scoreB: null });
+  }
+
+  const usedThisRound = new Set();
+  for (let i = 0; i < available.length; i++) {
+    const a = available[i];
+    if (usedThisRound.has(a)) continue;
+    let opponent = null;
+    for (let j = i + 1; j < available.length; j++) {
+      const b = available[j];
+      if (usedThisRound.has(b)) continue;
+      if (!played.has(a + "-" + b)) { opponent = b; break; }
+    }
+    if (opponent === null) {
+      for (let j = i + 1; j < available.length; j++) {
+        const b = available[j];
+        if (!usedThisRound.has(b)) { opponent = b; break; }
+      }
+    }
+    if (opponent !== null) {
+      matches.push({ id: uid(), teamA: a, teamB: opponent, winner: null, bye: false, scoreA: null, scoreB: null });
+      usedThisRound.add(a); usedThisRound.add(opponent);
+    }
+  }
+  return matches;
+}
+
+function startTournament() {
+  const c = getActiveClass();
+  if (!c || !state.teams || state.teams.length < 2) return;
+  const teamIds = state.teams.map(t => t.id);
+  const teamNames = {};
+  state.teams.forEach(t => { teamNames[t.id] = t.name; });
+  const fieldsCount = Math.max(1, state.tourFields);
+  const tournament = { format: state.tourFormat, fieldsCount, teamIds, teamNames };
+
+  if (state.tourFormat === "roundrobin") {
+    tournament.rounds = buildRoundRobinRounds(teamIds, fieldsCount, state.tourReturnLeg);
+    tournament.returnLeg = state.tourReturnLeg;
+  } else if (state.tourFormat === "knockout") {
+    tournament.koRounds = [buildFirstKoRound(shuffleArr(teamIds))];
+  } else if (state.tourFormat === "doubleElim") {
+    tournament.de = initDoubleElim(shuffleArr(teamIds), state.tourDeFinalMode);
+  } else if (state.tourFormat === "groupsKnockout" || state.tourFormat === "groupsDoubleElim") {
+    const groups = distributeIntoGroups(teamIds, state.tourGroupsCount);
+    groups.forEach(g => { g.rounds = buildRoundRobinRounds(g.teamIds, fieldsCount, state.tourReturnLeg); });
+    tournament.groups = groups;
+    tournament.groupsAdvance = Math.max(1, state.tourGroupsAdvance);
+    tournament.returnLeg = state.tourReturnLeg;
+    tournament.koFromGroups = null;
+    tournament.deFromGroups = null;
+  } else if (state.tourFormat === "swiss" || state.tourFormat === "swissKnockout") {
+    const totalRounds = state.tourSwissRoundsMode === "manual" ? Math.max(1, state.tourSwissRoundsManual) : autoSwissRounds(teamIds.length);
+    tournament.swiss = { rounds: [buildSwissRound(teamIds, [])], totalRounds };
+    tournament.swissQualifiers = Math.max(2, state.tourSwissQualifiers);
+    tournament.koFromSwiss = null;
+  }
+  c.tournament = tournament;
+  saveState();
+  render();
+}
+
+function startKnockoutFromGroups() {
+  const c = getActiveClass();
+  if (!c || !c.tournament) return;
+  const t = c.tournament;
+  const qualifiers = rankedQualifiers(t.groups, t.groupsAdvance);
+  if (qualifiers.length < 2) return;
+  t.koFromGroups = [buildFirstKoRound(qualifiers)];
+  saveState();
+  render();
+}
+
+function startDoubleElimFromGroups() {
+  const c = getActiveClass();
+  if (!c || !c.tournament) return;
+  const t = c.tournament;
+  const qualifiers = rankedQualifiers(t.groups, t.groupsAdvance);
+  if (qualifiers.length < 2) return;
+  t.deFromGroups = initDoubleElim(qualifiers, state.tourDeFinalMode);
+  saveState();
+  render();
+}
+
+function startKnockoutFromSwiss() {
+  const c = getActiveClass();
+  if (!c || !c.tournament) return;
+  const t = c.tournament;
+  const standings = computeStandings(t.teamIds, t.swiss.rounds);
+  const qualifiers = standings.slice(0, t.swissQualifiers).map(s => s.id);
+  if (qualifiers.length < 2) return;
+  t.koFromSwiss = [buildFirstKoRound(qualifiers)];
+  saveState();
+  render();
+}
+
+function resetTournament() {
+  const c = getActiveClass();
+  if (!c) return;
+  delete c.tournament;
+  saveState();
+  render();
+}
+
+function exportTournamentPDF(activeClass) {
+  const t = activeClass.tournament;
+  if (!t) return;
+  if (!window.jspdf) {
+    alert("Die PDF-Funktion konnte nicht geladen werden. Bitte prüfe deine Internetverbindung und versuch es erneut.");
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const margin = 15;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  let y = margin;
+
+  function ensureSpace(extra) {
+    if (y + extra > pageHeight - margin) { doc.addPage(); y = margin; }
+  }
+  function h1(text) {
+    ensureSpace(10);
+    doc.setFont(undefined, "bold"); doc.setFontSize(16);
+    doc.text(text, margin, y); y += 9;
+    doc.setFont(undefined, "normal"); doc.setFontSize(11);
+  }
+  function h2(text) {
+    ensureSpace(8);
+    doc.setFont(undefined, "bold"); doc.setFontSize(12);
+    doc.text(text, margin, y); y += 7;
+    doc.setFont(undefined, "normal"); doc.setFontSize(11);
+  }
+  function line(text) {
+    ensureSpace(6);
+    doc.text(String(text), margin, y); y += 6;
+  }
+  function spacer(h) { y += h; }
+
+  const names = t.teamNames;
+  function labelFor(id) { return (names && names[id]) || `Team ${id + 1}`; }
+  function matchLine(m) {
+    const a = labelFor(m.teamA);
+    if (m.bye) return `${a} — Freilos`;
+    const b = labelFor(m.teamB);
+    const score = (m.scoreA != null && m.scoreB != null) ? `${m.scoreA}:${m.scoreB}` : "– : –";
+    return `${a}   ${score}   ${b}`;
+  }
+  function printRounds(title, rounds) {
+    h2(title);
+    let lastLeg = null;
+    rounds.forEach((round, ridx) => {
+      const leg = round[0] && round[0].leg;
+      if (leg && leg !== lastLeg) { line(leg === 1 ? "Hinrunde" : "Rückrunde"); lastLeg = leg; }
+      line(`Runde ${ridx + 1}`);
+      round.forEach(m => line("   " + matchLine(m)));
+    });
+    spacer(3);
+  }
+  function printStandings(title, teamIds, rounds) {
+    h2(title);
+    computeStandings(teamIds, rounds).forEach((s, idx) => {
+      line(`${idx + 1}. ${labelFor(s.id)} — ${s.points} Pkt (${s.wins}S ${s.draws}U ${s.losses}N, Tore ${s.gf}:${s.ga})`);
+    });
+    spacer(3);
+  }
+  function printDoubleElim(de) {
+    printRounds("Winner-Bracket", de.wbRounds);
+    if (de.lbRounds.length > 0) printRounds("Verlierer-Bracket", de.lbRounds);
+    if (de.grandFinal) { h2("Grand Final"); line(matchLine(de.grandFinal)); spacer(3); }
+    if (de.bracketReset) { h2("Finale — 2. Spiel"); line(matchLine(de.bracketReset)); spacer(3); }
+    if (de.champion != null) { h2(`Champion: ${labelFor(de.champion)}`); }
+  }
+
+  const formatLabel = (TOUR_FORMATS.find(f => f.key === t.format) || {}).label || t.format;
+  h1("SportUp — Turnierplan");
+  doc.setFontSize(10); doc.setTextColor(100);
+  line(`${activeClass.name} · ${formatLabel} · ${new Date().toLocaleDateString("de-DE")}`);
+  doc.setTextColor(0); doc.setFontSize(11);
+  spacer(3);
+
+  if (t.format === "roundrobin") {
+    printRounds("Spielplan", t.rounds);
+    printStandings("Tabelle", t.teamIds, t.rounds);
+  } else if (t.format === "knockout") {
+    printRounds("K.-o.-Runde", t.koRounds);
+  } else if (t.format === "doubleElim") {
+    printDoubleElim(t.de);
+  } else if (t.format === "groupsKnockout" || t.format === "groupsDoubleElim") {
+    t.groups.forEach((g, gi) => {
+      printRounds(`Gruppe ${String.fromCharCode(65 + gi)}`, g.rounds);
+      printStandings(`Tabelle Gruppe ${String.fromCharCode(65 + gi)}`, g.teamIds, g.rounds);
+    });
+    if (t.format === "groupsKnockout" && t.koFromGroups) printRounds("K.-o.-Runde", t.koFromGroups);
+    if (t.format === "groupsDoubleElim" && t.deFromGroups) printDoubleElim(t.deFromGroups);
+  } else if (t.format === "swiss" || t.format === "swissKnockout") {
+    printRounds("Schweizer System", t.swiss.rounds);
+    printStandings("Tabelle", t.teamIds, t.swiss.rounds);
+    if (t.format === "swissKnockout" && t.koFromSwiss) printRounds("K.-o.-Runde", t.koFromSwiss);
+  }
+
+  const filenameSafe = activeClass.name.replace(/[^a-z0-9äöüß]+/gi, "_");
+  doc.save(`Turnierplan_${filenameSafe}.pdf`);
+}
+
+const TOUR_FORMATS = [
+  { key: "roundrobin", label: "Alle gegen alle" },
+  { key: "knockout", label: "K.-o.-System" },
+  { key: "groupsKnockout", label: "Gruppenphase + K.-o." },
+  { key: "doubleElim", label: "Doppel-K.-o." },
+  { key: "groupsDoubleElim", label: "Gruppenphase + Doppel-K.-o." },
+  { key: "swiss", label: "Schweizer System" },
+  { key: "swissKnockout", label: "Schweizer System + K.-o." },
+];
+
+function renderTournamentView(activeClass) {
+  const wrap = el("div", { class: "content" });
+
+  if (!state.teams || state.teams.length < 2) {
+    wrap.appendChild(el("div", { class: "empty-roster" }, `Bilde zuerst unter "Teams erstellen" mindestens 2 Teams, bevor du ein Turnier startest.`));
+    return wrap;
+  }
+
+  const t = activeClass.tournament;
+  const names = t ? t.teamNames : Object.fromEntries(state.teams.map(x => [x.id, x.name]));
+  function label(id) { return (names && names[id]) || `Team ${id + 1}`; }
+
+  function matchRow(m, requireWinner) {
+    const row = el("div", { class: "roster-row" });
+    if (m.bye) {
+      row.appendChild(el("span", { class: "roster-name" }, `${label(m.teamA)} — Freilos`));
+      return row;
+    }
+    const inner = el("div", { style: "display:flex;flex-direction:column;gap:8px;flex:1" });
+    inner.appendChild(el("span", { class: "roster-name" }, `${label(m.teamA)}  vs  ${label(m.teamB)}`));
+
+    const scoreRow = el("div", { style: "display:flex;align-items:center;gap:8px" });
+    const inputA = el("input", {
+      type: "number", min: "0", inputmode: "numeric", class: "text-input",
+      style: "width:60px;text-align:center;padding:8px;flex:none",
+      value: m.scoreA !== null && m.scoreA !== undefined ? String(m.scoreA) : "",
+      placeholder: "–",
+    });
+    inputA.addEventListener("change", (e) => {
+      const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
+      m.scoreA = (v === null || isNaN(v)) ? null : v;
+      updateWinnerFromScore(m);
+      saveState(); render();
+    });
+    const sep = el("span", { style: "color:var(--muted)" }, ":");
+    const inputB = el("input", {
+      type: "number", min: "0", inputmode: "numeric", class: "text-input",
+      style: "width:60px;text-align:center;padding:8px;flex:none",
+      value: m.scoreB !== null && m.scoreB !== undefined ? String(m.scoreB) : "",
+      placeholder: "–",
+    });
+    inputB.addEventListener("change", (e) => {
+      const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
+      m.scoreB = (v === null || isNaN(v)) ? null : v;
+      updateWinnerFromScore(m);
+      saveState(); render();
+    });
+    scoreRow.appendChild(inputA);
+    scoreRow.appendChild(sep);
+    scoreRow.appendChild(inputB);
+    inner.appendChild(scoreRow);
+
+    const bothEntered = m.scoreA !== null && m.scoreA !== undefined && m.scoreB !== null && m.scoreB !== undefined;
+    if (bothEntered) {
+      if (m.scoreA === m.scoreB) {
+        if (requireWinner) {
+          inner.appendChild(el("div", { class: "control-hint", style: "color:#E8A798" }, "Unentschieden — wer kommt weiter?"));
+          inner.appendChild(el("div", { class: "mode-row" }, [
+            el("button", { class: "mode-btn" + (m.winner === m.teamA ? " active" : ""), onClick: () => { m.winner = m.teamA; saveState(); render(); } }, label(m.teamA)),
+            el("button", { class: "mode-btn" + (m.winner === m.teamB ? " active" : ""), onClick: () => { m.winner = m.teamB; saveState(); render(); } }, label(m.teamB)),
+          ]));
+        } else {
+          inner.appendChild(el("div", { class: "control-hint" }, "Unentschieden"));
+        }
+      } else {
+        inner.appendChild(el("div", { class: "control-hint" }, `Sieger: ${label(m.winner)}`));
+      }
+    }
+    row.appendChild(inner);
+    return row;
+  }
+
+  function standingsTable(teamIds, rounds) {
+    const table = el("div", { class: "roster-list" });
+    computeStandings(teamIds, rounds).forEach((s, idx) => {
+      const r = el("div", { class: "roster-row" });
+      r.appendChild(el("span", { class: "roster-name" }, `${idx + 1}. ${label(s.id)}`));
+      const info = el("div", { style: "display:flex;flex-direction:column;align-items:flex-end;gap:2px" });
+      info.appendChild(el("span", { class: "chip-btn" }, `${s.points} Pkt`));
+      info.appendChild(el("span", { class: "control-hint" }, `${s.wins}S ${s.draws}U ${s.losses}N · Tore ${s.gf}:${s.ga}`));
+      r.appendChild(info);
+      table.appendChild(r);
+    });
+    return table;
+  }
+
+  function roundsBlock(title, rounds) {
+    const box = el("div", { class: "control-panel" });
+    box.appendChild(el("label", { class: "control-label" }, title));
+    let lastLeg = null;
+    rounds.forEach((round, ridx) => {
+      const leg = round[0] && round[0].leg;
+      if (leg && leg !== lastLeg) {
+        box.appendChild(el("div", { class: "control-label", style: "margin-top:6px" }, leg === 1 ? "Hinrunde" : "Rückrunde"));
+        lastLeg = leg;
+      }
+      box.appendChild(el("div", { class: "control-hint" }, `Runde ${ridx + 1}`));
+      const list = el("div", { class: "roster-list" });
+      round.forEach(m => list.appendChild(matchRow(m, false)));
+      box.appendChild(list);
+    });
+    return box;
+  }
+
+  function knockoutBlock(koRounds, title, onAdvance) {
+    const box = el("div", { class: "control-panel" });
+    box.appendChild(el("label", { class: "control-label" }, title));
+    koRounds.forEach((round, ridx) => {
+      box.appendChild(el("div", { class: "control-hint" }, `Runde ${ridx + 1}`));
+      const list = el("div", { class: "roster-list" });
+      round.forEach(m => list.appendChild(matchRow(m, true)));
+      box.appendChild(list);
+    });
+    const last = koRounds[koRounds.length - 1];
+    const decided = allDecided(last);
+    if (decided && last.length > 1) {
+      box.appendChild(el("button", { class: "btn-primary-sm", onClick: () => { onAdvance(); saveState(); render(); } }, "Nächste Runde erstellen"));
+    } else if (decided && last.length === 1) {
+      box.appendChild(el("div", { class: "empty-roster", style: "color:#D9A427;font-weight:600" }, `🏆 Champion: ${label(last[0].winner)}`));
+    }
+    return box;
+  }
+
+  function doubleElimBlock(de) {
+    const box = el("div", {});
+    box.appendChild(roundsBlockKo("Winner-Bracket", de.wbRounds));
+    if (de.lbRounds.length > 0) box.appendChild(roundsBlockKo("Verlierer-Bracket", de.lbRounds));
+
+    if (de.grandFinal) {
+      const gfBox = el("div", { class: "control-panel" });
+      gfBox.appendChild(el("label", { class: "control-label" }, "🏆 Grand Final"));
+      const list = el("div", { class: "roster-list" });
+      list.appendChild(matchRow(de.grandFinal, true));
+      gfBox.appendChild(list);
+      box.appendChild(gfBox);
+    }
+    if (de.bracketReset) {
+      const brBox = el("div", { class: "control-panel" });
+      brBox.appendChild(el("label", { class: "control-label" }, "🏆 Finale — 2. Spiel (Bracket-Reset)"));
+      const list = el("div", { class: "roster-list" });
+      list.appendChild(matchRow(de.bracketReset, true));
+      brBox.appendChild(list);
+      box.appendChild(brBox);
+    }
+
+    if (de.champion != null) {
+      box.appendChild(el("div", { class: "empty-roster", style: "color:#D9A427;font-weight:600;text-align:center" }, `🏆 Champion: ${label(de.champion)}`));
+    } else {
+      box.appendChild(el("button", { class: "btn-primary-sm", onClick: () => { advanceDoubleElim(de); saveState(); render(); } }, "Weiter"));
+    }
+    return box;
+  }
+
+  function roundsBlockKo(title, rounds) {
+    const box = el("div", { class: "control-panel" });
+    box.appendChild(el("label", { class: "control-label" }, title));
+    rounds.forEach((round, ridx) => {
+      box.appendChild(el("div", { class: "control-hint" }, `Runde ${ridx + 1}`));
+      const list = el("div", { class: "roster-list" });
+      round.forEach(m => list.appendChild(matchRow(m, true)));
+      box.appendChild(list);
+    });
+    return box;
+  }
+
+  // ---- Einrichtung ----
+  if (!t) {
+    const panel = el("div", { class: "control-panel" });
+    panel.appendChild(el("div", {}, [
+      el("label", { class: "control-label" }, "Format"),
+    ]));
+    const select = el("select", { class: "text-input" });
+    TOUR_FORMATS.forEach(f => {
+      const opt = el("option", { value: f.key }, f.label);
+      if (f.key === state.tourFormat) opt.setAttribute("selected", "selected");
+      select.appendChild(opt);
+    });
+    select.addEventListener("change", (e) => { state.tourFormat = e.target.value; render(); });
+    panel.appendChild(select);
+
+    panel.appendChild(el("div", {}, [
+      el("label", { class: "control-label" }, "Gleichzeitige Spielfelder"),
+      el("div", { class: "stepper" }, [
+        el("button", { class: "stepper-btn", onClick: () => { state.tourFields = Math.max(1, state.tourFields - 1); render(); } }, "−"),
+        el("span", { class: "stepper-value" }, String(state.tourFields)),
+        el("button", { class: "stepper-btn", onClick: () => { state.tourFields = Math.min(10, state.tourFields + 1); render(); } }, "+"),
+      ]),
+    ]));
+
+    const isGroupsFormat = state.tourFormat === "groupsKnockout" || state.tourFormat === "groupsDoubleElim";
+    if (isGroupsFormat) {
+      panel.appendChild(el("div", {}, [
+        el("label", { class: "control-label" }, "Anzahl Gruppen"),
+        el("div", { class: "stepper" }, [
+          el("button", { class: "stepper-btn", onClick: () => { state.tourGroupsCount = Math.max(2, state.tourGroupsCount - 1); render(); } }, "−"),
+          el("span", { class: "stepper-value" }, String(state.tourGroupsCount)),
+          el("button", { class: "stepper-btn", onClick: () => { state.tourGroupsCount = Math.min(8, state.tourGroupsCount + 1); render(); } }, "+"),
+        ]),
+      ]));
+      panel.appendChild(el("div", {}, [
+        el("label", { class: "control-label" }, "Aufsteiger pro Gruppe"),
+        el("div", { class: "stepper" }, [
+          el("button", { class: "stepper-btn", onClick: () => { state.tourGroupsAdvance = Math.max(1, state.tourGroupsAdvance - 1); render(); } }, "−"),
+          el("span", { class: "stepper-value" }, String(state.tourGroupsAdvance)),
+          el("button", { class: "stepper-btn", onClick: () => { state.tourGroupsAdvance = Math.min(4, state.tourGroupsAdvance + 1); render(); } }, "+"),
+        ]),
+      ]));
+      if (state.teams.length < state.tourGroupsCount * 2) {
+        panel.appendChild(el("div", { class: "control-hint", style: "color:#E8A798" }, "Für so viele Gruppen sind mehr Teams empfehlenswert."));
+      }
+      panel.appendChild(el("div", {}, [
+        el("label", { class: "control-label" }, "Innerhalb der Gruppen"),
+        el("div", { class: "mode-row" }, [
+          el("button", { class: "mode-btn" + (!state.tourReturnLeg ? " active" : ""), onClick: () => { state.tourReturnLeg = false; render(); } }, "Nur Hinrunde"),
+          el("button", { class: "mode-btn" + (state.tourReturnLeg ? " active" : ""), onClick: () => { state.tourReturnLeg = true; render(); } }, "Mit Rückrunde"),
+        ]),
+      ]));
+    }
+
+    if (state.tourFormat === "roundrobin") {
+      panel.appendChild(el("div", {}, [
+        el("label", { class: "control-label" }, "Spielrunden"),
+        el("div", { class: "mode-row" }, [
+          el("button", { class: "mode-btn" + (!state.tourReturnLeg ? " active" : ""), onClick: () => { state.tourReturnLeg = false; render(); } }, "Nur Hinrunde"),
+          el("button", { class: "mode-btn" + (state.tourReturnLeg ? " active" : ""), onClick: () => { state.tourReturnLeg = true; render(); } }, "Mit Rückrunde"),
+        ]),
+      ]));
+    }
+
+    const isDoubleElim = state.tourFormat === "doubleElim" || state.tourFormat === "groupsDoubleElim";
+    if (isDoubleElim) {
+      panel.appendChild(el("div", {}, [
+        el("label", { class: "control-label" }, "Finale bei Team aus dem Verlierer-Bracket"),
+        el("div", { class: "mode-row" }, [
+          el("button", { class: "mode-btn" + (state.tourDeFinalMode === "single" ? " active" : ""), onClick: () => { state.tourDeFinalMode = "single"; render(); } }, "Ein Finalspiel"),
+          el("button", { class: "mode-btn" + (state.tourDeFinalMode === "reset" ? " active" : ""), onClick: () => { state.tourDeFinalMode = "reset"; render(); } }, "Bracket-Reset (2. Finale bei Bedarf)"),
+        ]),
+      ]));
+    }
+
+    const isSwissFormat = state.tourFormat === "swiss" || state.tourFormat === "swissKnockout";
+    if (isSwissFormat) {
+      panel.appendChild(el("div", {}, [
+        el("label", { class: "control-label" }, "Rundenzahl"),
+        el("div", { class: "mode-row" }, [
+          el("button", { class: "mode-btn" + (state.tourSwissRoundsMode === "auto" ? " active" : ""), onClick: () => { state.tourSwissRoundsMode = "auto"; render(); } }, `Automatisch (${autoSwissRounds(state.teams.length)})`),
+          el("button", { class: "mode-btn" + (state.tourSwissRoundsMode === "manual" ? " active" : ""), onClick: () => { state.tourSwissRoundsMode = "manual"; render(); } }, "Selbst festlegen"),
+        ]),
+      ]));
+      if (state.tourSwissRoundsMode === "manual") {
+        panel.appendChild(el("div", {}, [
+          el("label", { class: "control-label" }, "Anzahl Runden"),
+          el("div", { class: "stepper" }, [
+            el("button", { class: "stepper-btn", onClick: () => { state.tourSwissRoundsManual = Math.max(1, state.tourSwissRoundsManual - 1); render(); } }, "−"),
+            el("span", { class: "stepper-value" }, String(state.tourSwissRoundsManual)),
+            el("button", { class: "stepper-btn", onClick: () => { state.tourSwissRoundsManual = Math.min(state.teams.length - 1 || 1, state.tourSwissRoundsManual + 1); render(); } }, "+"),
+          ]),
+        ]));
+      }
+    }
+    if (state.tourFormat === "swissKnockout") {
+      panel.appendChild(el("div", {}, [
+        el("label", { class: "control-label" }, "Wie viele kommen in die K.-o.-Runde"),
+        el("div", { class: "stepper" }, [
+          el("button", { class: "stepper-btn", onClick: () => { state.tourSwissQualifiers = Math.max(2, state.tourSwissQualifiers - 1); render(); } }, "−"),
+          el("span", { class: "stepper-value" }, String(state.tourSwissQualifiers)),
+          el("button", { class: "stepper-btn", onClick: () => { state.tourSwissQualifiers = Math.min(state.teams.length, state.tourSwissQualifiers + 1); render(); } }, "+"),
+        ]),
+      ]));
+    }
+
+    panel.appendChild(el("button", { class: "btn-primary", onClick: startTournament }, "🏆 Turnier erstellen"));
+    panel.appendChild(el("div", { class: "control-hint" }, `Aktuelle Teams: ${state.teams.length}`));
+    wrap.appendChild(panel);
+    return wrap;
+  }
+
+  // ---- Laufendes Turnier ----
+  wrap.appendChild(el("div", { class: "add-row" }, [
+    el("button", { class: "chip-btn", onClick: resetTournament }, "↺ Neues Turnier"),
+    el("button", { class: "chip-btn", onClick: () => exportTournamentPDF(activeClass) }, "📄 Als PDF exportieren"),
+  ]));
+
+  if (t.format === "roundrobin") {
+    wrap.appendChild(roundsBlock("Spielplan", t.rounds));
+    const standingsBox = el("div", { class: "control-panel" });
+    standingsBox.appendChild(el("label", { class: "control-label" }, "🏆 Tabelle"));
+    standingsBox.appendChild(standingsTable(t.teamIds, t.rounds));
+    wrap.appendChild(standingsBox);
+  } else if (t.format === "knockout") {
+    wrap.appendChild(knockoutBlock(t.koRounds, "K.-o.-Runde", () => tryAdvanceKnockout(t.koRounds)));
+  } else if (t.format === "doubleElim") {
+    wrap.appendChild(doubleElimBlock(t.de));
+  } else if (t.format === "groupsKnockout" || t.format === "groupsDoubleElim") {
+    t.groups.forEach((g, gi) => {
+      const box = el("div", { class: "control-panel" });
+      box.appendChild(el("label", { class: "control-label" }, `Gruppe ${String.fromCharCode(65 + gi)}`));
+      let lastLeg = null;
+      g.rounds.forEach((round, ridx) => {
+        const leg = round[0] && round[0].leg;
+        if (leg && leg !== lastLeg) {
+          box.appendChild(el("div", { class: "control-label", style: "margin-top:6px" }, leg === 1 ? "Hinrunde" : "Rückrunde"));
+          lastLeg = leg;
+        }
+        box.appendChild(el("div", { class: "control-hint" }, `Runde ${ridx + 1}`));
+        const list = el("div", { class: "roster-list" });
+        round.forEach(m => list.appendChild(matchRow(m, false)));
+        box.appendChild(list);
+      });
+      box.appendChild(el("div", { class: "control-hint" }, "Tabelle"));
+      box.appendChild(standingsTable(g.teamIds, g.rounds));
+      wrap.appendChild(box);
+    });
+
+    const allGroupsDone = t.groups.every(g => g.rounds.every(r => allDecided(r)));
+    if (t.format === "groupsKnockout") {
+      if (allGroupsDone && !t.koFromGroups) {
+        wrap.appendChild(el("button", { class: "btn-primary", onClick: startKnockoutFromGroups }, "🏆 Zur K.-o.-Runde"));
+      }
+      if (t.koFromGroups) {
+        wrap.appendChild(knockoutBlock(t.koFromGroups, "🏆 K.-o.-Runde", () => tryAdvanceKnockout(t.koFromGroups)));
+      }
+    } else {
+      if (allGroupsDone && !t.deFromGroups) {
+        wrap.appendChild(el("button", { class: "btn-primary", onClick: startDoubleElimFromGroups }, "🏆 Zur Doppel-K.-o.-Runde"));
+      }
+      if (t.deFromGroups) {
+        wrap.appendChild(doubleElimBlock(t.deFromGroups));
+      }
+    }
+  } else if (t.format === "swiss" || t.format === "swissKnockout") {
+    const sw = t.swiss;
+    wrap.appendChild(el("div", { class: "control-hint", style: "text-align:center;margin-bottom:6px" }, `Runde ${sw.rounds.length} von ${sw.totalRounds}`));
+    wrap.appendChild(roundsBlock("Schweizer System", sw.rounds));
+
+    const standingsBox = el("div", { class: "control-panel" });
+    standingsBox.appendChild(el("label", { class: "control-label" }, sw.rounds.length >= sw.totalRounds ? "🏆 Endstand" : "Zwischenstand"));
+    standingsBox.appendChild(standingsTable(t.teamIds, sw.rounds));
+    wrap.appendChild(standingsBox);
+
+    const lastRound = sw.rounds[sw.rounds.length - 1];
+    if (allDecided(lastRound) && sw.rounds.length < sw.totalRounds) {
+      wrap.appendChild(el("button", { class: "btn-primary", onClick: () => {
+        sw.rounds.push(buildSwissRound(t.teamIds, sw.rounds));
+        saveState(); render();
+      } }, "Nächste Runde erstellen"));
+    }
+
+    if (t.format === "swissKnockout" && allDecided(lastRound) && sw.rounds.length >= sw.totalRounds) {
+      if (!t.koFromSwiss) {
+        wrap.appendChild(el("button", { class: "btn-primary", onClick: startKnockoutFromSwiss }, "🏆 Zur K.-o.-Runde"));
+      } else {
+        wrap.appendChild(knockoutBlock(t.koFromSwiss, "🏆 K.-o.-Runde", () => tryAdvanceKnockout(t.koFromSwiss)));
+      }
+    }
+  }
+
+  return wrap;
+}
+
+function render() {
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+  app.appendChild(renderHeader());
+
+  const activeClass = getActiveClass();
+  if (!activeClass) {
+    app.appendChild(renderEmptyState());
+    return;
+  }
+  app.appendChild(renderSubHeader(activeClass));
+  let viewNode;
+  if (state.view === "class") viewNode = state.classSubview === "rules" ? renderRulesView(activeClass) : renderRosterView(activeClass);
+  else if (state.view === "generate") viewNode = renderGenerateView(activeClass);
+  else if (state.view === "pick") viewNode = renderPickView(activeClass);
+  else if (state.view === "tournament") viewNode = renderTournamentView(activeClass);
+  else viewNode = renderHomeView(activeClass);
+  app.appendChild(viewNode);
+}
+
+loadState();
+render();
+</script>
+</body>
+</html>
