@@ -1,4 +1,4 @@
-const CACHE_VERSION = "sportup-v2";
+const CACHE_VERSION = "sportup-v3";
 
 const APP_SHELL = [
   "./",
