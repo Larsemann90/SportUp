@@ -90,7 +90,7 @@
 
   .empty-roster{color:var(--muted);font-size:14px;padding:20px 0;}
   .roster-list{display:flex;flex-direction:column;gap:6px;}
-  .roster-row{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--panel-border);border-radius:9px;padding:9px 12px;}
+  .roster-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--panel-border);border-radius:9px;padding:9px 12px;}
   .roster-name{flex:1;font-size:14.5px;}
   .roster-name.excluded{opacity:.4;}
   .chip-btn{background:#24384A;border:1px solid var(--border);color:var(--muted2);font-size:12px;padding:4px 9px;border-radius:999px;font-family:'JetBrains Mono',monospace;}
@@ -129,6 +129,7 @@
   .seat-cell.table.has-student{background:var(--accent);color:var(--accent-text);}
   .seat-cell.table.fixed{outline:2px solid #3E8B5C;outline-offset:-2px;}
   .seat-cell.table.conflict{outline:2px solid #C8442C;outline-offset:-2px;}
+  .seat-cell.selected{outline:2px solid #4FA8E0;outline-offset:-2px;background:rgba(79,168,224,0.22);}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -225,6 +226,7 @@ let state = {
   studentsPerTeam: 4,
   sizeMode: "teams", // teams | perTeam
   mode: "balanced", // random | balanced | stacked
+  genderMode: "none", // none | separate | mixed | balanced
   teams: null,
   teamsWarning: null,
   editingTeamId: null,
@@ -359,29 +361,21 @@ function tableAt(tables, r, c) {
 }
 
 function computeGroups(tables) {
-  // Liefert Map: tableId -> Array aller tableIds derselben (4er-Nachbarschaft) Tischgruppe
-  const byPos = new Map(tables.map((t) => [`${t.r},${t.c}`, t]));
-  const visited = new Set();
+  // Liefert Map: tableId -> Array aller tableIds derselben Tischgruppe.
+  // Gruppen werden nicht mehr aus der Geometrie geraten, sondern sind explizit
+  // über table.groupId gesetzt (siehe Layout-Editor, "Tischgruppen festlegen").
+  // Tische ohne groupId gelten als eigene Einzel-Gruppe.
+  const byGroupId = new Map();
+  tables.forEach((t) => {
+    const key = t.groupId || `solo_${t.id}`;
+    if (!byGroupId.has(key)) byGroupId.set(key, []);
+    byGroupId.get(key).push(t.id);
+  });
   const groupOf = new Map();
-  for (const t of tables) {
-    if (visited.has(t.id)) continue;
-    const stack = [t];
-    const group = [];
-    visited.add(t.id);
-    while (stack.length) {
-      const cur = stack.pop();
-      group.push(cur.id);
-      [
-        byPos.get(`${cur.r - 1},${cur.c}`),
-        byPos.get(`${cur.r + 1},${cur.c}`),
-        byPos.get(`${cur.r},${cur.c - 1}`),
-        byPos.get(`${cur.r},${cur.c + 1}`),
-      ].forEach((n) => {
-        if (n && !visited.has(n.id)) { visited.add(n.id); stack.push(n); }
-      });
-    }
-    group.forEach((id) => groupOf.set(id, group));
-  }
+  tables.forEach((t) => {
+    const key = t.groupId || `solo_${t.id}`;
+    groupOf.set(t.id, byGroupId.get(key));
+  });
   return groupOf;
 }
 
@@ -401,6 +395,8 @@ function openLayoutEditor(layout) {
   state.layoutDraft = layout
     ? JSON.parse(JSON.stringify(layout))
     : { id: uid(), name: "", rows: 6, cols: 6, tables: [] };
+  state.layoutDraft.groupingMode = false;
+  state.layoutDraft.groupSelection = [];
   state.view = "seatingLayoutEditor";
   render();
 }
@@ -415,7 +411,41 @@ function toggleLayoutTable(r, c) {
   const d = state.layoutDraft;
   const existing = tableAt(d.tables, r, c);
   if (existing) d.tables = d.tables.filter((t) => t !== existing);
-  else d.tables.push({ id: `${r}_${c}`, r, c });
+  else d.tables.push({ id: `${r}_${c}`, r, c, groupId: null });
+  render();
+}
+
+function toggleGroupingMode() {
+  const d = state.layoutDraft;
+  d.groupingMode = !d.groupingMode;
+  d.groupSelection = [];
+  render();
+}
+
+function toggleGroupSelection(tableId) {
+  const d = state.layoutDraft;
+  d.groupSelection = d.groupSelection || [];
+  if (d.groupSelection.includes(tableId)) d.groupSelection = d.groupSelection.filter((id) => id !== tableId);
+  else d.groupSelection.push(tableId);
+  render();
+}
+
+function formGroupFromSelection() {
+  const d = state.layoutDraft;
+  const sel = d.groupSelection || [];
+  if (sel.length < 2) { alert("Bitte mindestens zwei Tische auswählen, die zusammengehören."); return; }
+  const newGroupId = uid();
+  d.tables.forEach((t) => { if (sel.includes(t.id)) t.groupId = newGroupId; });
+  d.groupSelection = [];
+  render();
+}
+
+function ungroupSelection() {
+  const d = state.layoutDraft;
+  const sel = d.groupSelection || [];
+  if (sel.length === 0) { alert("Bitte mindestens einen Tisch auswählen."); return; }
+  d.tables.forEach((t) => { if (sel.includes(t.id)) t.groupId = null; });
+  d.groupSelection = [];
   render();
 }
 
@@ -433,8 +463,14 @@ async function saveLayoutDraft(name) {
   const trimmed = (name || "").trim();
   if (!trimmed) { alert("Bitte einen Namen für das Layout eingeben."); return; }
   if (d.tables.length === 0) { alert("Bitte mindestens einen Tisch hinzufügen."); return; }
-  d.name = trimmed;
-  await saveLayoutToDb(d);
+  const payload = {
+    id: d.id,
+    name: trimmed,
+    rows: d.rows,
+    cols: d.cols,
+    tables: d.tables.map((t) => ({ id: t.id, r: t.r, c: t.c, groupId: t.groupId || null })),
+  };
+  await saveLayoutToDb(payload);
   state.layoutDraft = null;
   state.view = "seatingHome";
   render();
@@ -468,6 +504,7 @@ function startNewSeatingPlan() {
     assignments: {},
     fixed: [],
     rules: { must: [], mustNot: [], mustNotGroup: [] },
+    genderMode: "none",
     lastConflicts: [],
   };
   state.view = "seatingPlan";
@@ -479,6 +516,7 @@ function loadSeatingPlan(id) {
   if (!p) return;
   state.planDraft = JSON.parse(JSON.stringify(p));
   state.planDraft.lastConflicts = state.planDraft.lastConflicts || [];
+  state.planDraft.genderMode = state.planDraft.genderMode || "none";
   state.view = "seatingPlan";
   render();
 }
@@ -501,6 +539,10 @@ function planClass() {
 function studentName(klasse, studentId) {
   const s = klasse.students.find((x) => x.id === studentId);
   return s ? s.name : "?";
+}
+
+function genderLabel(gender) {
+  return gender === "m" ? "♂" : gender === "w" ? "♀" : gender === "d" ? "⚧" : "";
 }
 
 function onSeatingTableClick(tableId) {
@@ -575,6 +617,8 @@ function generateSeatingPlan() {
   const freeStudentIds = klasse.students.map((s) => s.id).filter((id) => !fixedStudentIds.has(id));
 
   const nameOf = (id) => studentName(klasse, id);
+  const genderMode = p.genderMode || "none";
+  const genderRatio = classGenderRatio(klasse.students);
 
   function scoreOf(assignment) {
     const violations = [];
@@ -604,6 +648,24 @@ function generateSeatingPlan() {
         violations.push({ msg: `${nameOf(a)} und ${nameOf(b)} sollten nicht mal an derselben Tischgruppe sitzen, sind aber in derselben Gruppe.`, tables: [ta, tb] });
       }
     });
+
+    if (genderMode !== "none") {
+      const visited = new Set();
+      layout.tables.forEach((t) => {
+        const groupArr = groups.get(t.id);
+        if (!groupArr || groupArr.length < 2 || visited.has(groupArr[0])) return;
+        visited.add(groupArr[0]);
+        const seated = groupArr.map((tid) => assignment[tid]).filter(Boolean).map((sid) => klasse.students.find((s) => s.id === sid)).filter(Boolean);
+        if (seated.length < 2) return;
+        const gv = genderGroupViolations(seated, genderMode, genderRatio);
+        if (gv.length) {
+          const label = genderMode === "separate" ? "Tischgruppe hat gemischte Geschlechter, obwohl getrennte Gruppen gewünscht sind."
+            : genderMode === "mixed" ? "Tischgruppe ist einheitlich (nur ein Geschlecht), obwohl gemischte Gruppen gewünscht sind."
+            : "Geschlechterverteilung an einer Tischgruppe weicht vom Klassendurchschnitt ab.";
+          violations.push({ msg: label, tables: groupArr, weight: gv[0].weight });
+        }
+      });
+    }
     return violations;
   }
 
@@ -629,7 +691,7 @@ function generateSeatingPlan() {
     let currentViolations = scoreOf(current);
 
     for (let swap = 0; swap < SWAPS_PER_RESTART; swap++) {
-      if (currentViolations.length === 0) break;
+      if (violationWeight(currentViolations) === 0) break;
       const movable = shuffledTables.filter((t) => current[t]);
       if (movable.length < 2) break;
       const i = Math.floor(Math.random() * movable.length);
@@ -638,12 +700,12 @@ function generateSeatingPlan() {
       const t1 = movable[i], t2 = movable[j];
       const tmp = current[t1]; current[t1] = current[t2]; current[t2] = tmp;
       const newViolations = scoreOf(current);
-      if (newViolations.length <= currentViolations.length) currentViolations = newViolations;
+      if (violationWeight(newViolations) <= violationWeight(currentViolations)) currentViolations = newViolations;
       else { const tmp2 = current[t1]; current[t1] = current[t2]; current[t2] = tmp2; }
     }
 
-    if (currentViolations.length < bestScore) {
-      bestScore = currentViolations.length;
+    if (violationWeight(currentViolations) < bestScore) {
+      bestScore = violationWeight(currentViolations);
       best = { assignment: { ...current }, violations: currentViolations };
       if (bestScore === 0) break;
     }
@@ -765,7 +827,7 @@ function addStudent() {
   const name = state.newName.trim();
   const c = getActiveClass();
   if (!name || !c) return;
-  c.students.push({ id: uid(), name, skill: state.newSkill, note: "" });
+  c.students.push({ id: uid(), name, skill: state.newSkill, note: "", gender: "" });
   state.newName = "";
   state.newSkill = 3;
   saveState();
@@ -780,7 +842,7 @@ function addBulkStudents() {
     .map(n => n.trim())
     .filter(n => n.length > 0);
   if (names.length === 0) return;
-  names.forEach(name => c.students.push({ id: uid(), name, skill: 3, note: "" }));
+  names.forEach(name => c.students.push({ id: uid(), name, skill: 3, note: "", gender: "" }));
   state.bulkText = "";
   saveState();
   render();
@@ -811,6 +873,27 @@ function updateStudentNote(id, note) {
   if (s) s.note = note;
   saveState();
   render();
+}
+
+function updateStudentGender(id, gender) {
+  const c = getActiveClass();
+  if (!c) return;
+  const s = c.students.find(s => s.id === id);
+  if (s) s.gender = s.gender === gender ? "" : gender; // erneutes Antippen setzt zurück auf "nicht angegeben"
+  saveState();
+  render();
+}
+
+function genderPickerEl(current, onPick) {
+  const opts = [["m", "M"], ["w", "W"], ["d", "D"]];
+  return el("div", { class: "mode-row", style: "gap:4px" },
+    opts.map(([val, label]) => el("button", {
+      class: "chip-btn small" + (current === val ? " active" : ""),
+      style: "padding:4px 9px;font-size:12px",
+      title: val === "m" ? "männlich" : val === "w" ? "weiblich" : "divers",
+      onClick: () => onPick(val),
+    }, label))
+  );
 }
 
 function toggleExcluded(id) {
@@ -984,6 +1067,41 @@ function buildUnits(pool, togetherPairs) {
   }));
 }
 
+function violationWeight(list) {
+  return list.reduce((sum, v) => sum + (v.weight || 1), 0);
+}
+
+function classGenderRatio(students) {
+  // Divers zählt bewusst nicht in die Geschlechter-Balance hinein.
+  let m = 0, w = 0;
+  students.forEach((s) => { if (s.gender === "m") m++; else if (s.gender === "w") w++; });
+  const total = m + w;
+  if (total === 0) return null;
+  return { mShare: m / total, wShare: w / total };
+}
+
+function genderGroupViolations(students, mode, ratio) {
+  // students: Array der Schüler:innen-Objekte in einer Gruppe/einem Team.
+  // Divers und ohne Angabe werden ignoriert — sie werden einfach zufällig mitverteilt.
+  if (!mode || mode === "none") return [];
+  let m = 0, w = 0;
+  students.forEach((s) => { if (s.gender === "m") m++; else if (s.gender === "w") w++; });
+  const totalMW = m + w;
+  if (mode === "separate") {
+    if (m > 0 && w > 0) return [{ weight: 1 }];
+  } else if (mode === "mixed") {
+    if (totalMW === 0) return [];
+    if (!(m >= 1 && w >= 1)) return [{ weight: 1 }];
+  } else if (mode === "balanced" && ratio) {
+    if (totalMW === 0) return [];
+    const idealM = ratio.mShare * totalMW;
+    const idealW = ratio.wShare * totalMW;
+    const rounded = Math.round(Math.abs(m - idealM) + Math.abs(w - idealW));
+    if (rounded > 0) return [{ weight: rounded }];
+  }
+  return [];
+}
+
 function generateTeams() {
   const c = getActiveClass();
   if (!c) return;
@@ -1079,9 +1197,51 @@ function generateTeams() {
 
   const finalSlotOf = slotMap();
   const stillViolated = apartPairs.filter(([a, b]) => finalSlotOf[a] && finalSlotOf[b] && finalSlotOf[a] === finalSlotOf[b]).length;
-  state.teamsWarning = stillViolated > 0
-    ? `${stillViolated} "Nie zusammen"-Regel(n) konnten nicht eingehalten werden — zu viele Einschränkungen gleichzeitig.`
-    : null;
+
+  // ---- Geschlechter-Ausgleich (optional, per state.genderMode) ----
+  let genderIssues = 0;
+  if (state.genderMode && state.genderMode !== "none" && units.length >= 2 && n >= 2) {
+    const ratio = classGenderRatio(pool);
+    function countApartViol(sl) {
+      const slotOf = {};
+      sl.forEach((s) => s.students.forEach((st) => { slotOf[st.id] = s; }));
+      return apartPairs.filter(([a, b]) => slotOf[a] && slotOf[b] && slotOf[a] === slotOf[b]).length;
+    }
+    function totalGenderScore(sl) {
+      return sl.reduce((sum, s) => sum + violationWeight(genderGroupViolations(s.students, state.genderMode, ratio)), 0);
+    }
+    function unitSlot(u) {
+      return slots.find((s) => s.students.some((st) => u.ids.includes(st.id)));
+    }
+    let curApart = countApartViol(slots);
+    let curGender = totalGenderScore(slots);
+    for (let iter = 0; iter < 400 && !(curApart === 0 && curGender === 0); iter++) {
+      const uA = units[Math.floor(Math.random() * units.length)];
+      const uB = units[Math.floor(Math.random() * units.length)];
+      const sA = unitSlot(uA), sB = unitSlot(uB);
+      if (!sA || !sB || sA === sB) continue;
+      sA.students = sA.students.filter((st) => !uA.ids.includes(st.id));
+      sB.students = sB.students.filter((st) => !uB.ids.includes(st.id));
+      sA.students.push(...uB.students);
+      sB.students.push(...uA.students);
+      const newApart = countApartViol(slots);
+      const newGender = totalGenderScore(slots);
+      if (newApart * 1000 + newGender <= curApart * 1000 + curGender) {
+        curApart = newApart; curGender = newGender;
+      } else {
+        sA.students = sA.students.filter((st) => !uB.ids.includes(st.id));
+        sB.students = sB.students.filter((st) => !uA.ids.includes(st.id));
+        sA.students.push(...uA.students);
+        sB.students.push(...uB.students);
+      }
+    }
+    genderIssues = curGender;
+  }
+
+  const warnings = [];
+  if (stillViolated > 0) warnings.push(`${stillViolated} "Nie zusammen"-Regel(n) konnten nicht eingehalten werden`);
+  if (genderIssues > 0) warnings.push(`Geschlechterverteilung konnte nicht überall wie gewünscht eingehalten werden`);
+  state.teamsWarning = warnings.length ? warnings.join(" — ") + " — zu viele Einschränkungen gleichzeitig." : null;
 
   state.teams = slots;
   render();
@@ -1362,7 +1522,7 @@ function buildClassSharePayload(c) {
   c.students.forEach((s, i) => { idx[s.id] = i; });
   const t = (c.rules && c.rules.together || []).map(([a, b]) => [idx[a], idx[b]]).filter(([a, b]) => a != null && b != null);
   const ap = (c.rules && c.rules.apart || []).map(([a, b]) => [idx[a], idx[b]]).filter(([a, b]) => a != null && b != null);
-  return { n: c.name, s: c.students.map(s => [s.name, s.skill, s.note || ""]), t, ap };
+  return { n: c.name, s: c.students.map(s => [s.name, s.skill, s.note || "", s.gender || ""]), t, ap };
 }
 
 function buildShareUrl(c) {
@@ -1374,7 +1534,7 @@ function buildShareUrl(c) {
 function confirmPendingImport() {
   const payload = state.pendingImportPayload;
   if (!payload) return;
-  const students = payload.s.map(([name, skill, note]) => ({ id: uid(), name, skill: skill || 3, note: note || "" }));
+  const students = payload.s.map(([name, skill, note, gender]) => ({ id: uid(), name, skill: skill || 3, note: note || "", gender: gender || "" }));
   const remap = (pairs) => (pairs || []).map(([a, b]) => [students[a] && students[a].id, students[b] && students[b].id]).filter(([a, b]) => a && b);
   const newClass = {
     id: uid(), name: payload.n, students,
@@ -1571,6 +1731,7 @@ function renderRosterView(activeClass) {
     activeClass.students.forEach(s => {
       const row = el("div", { class: "roster-row" });
       row.appendChild(el("span", { class: "roster-name" + (state.excluded[s.id] ? " excluded" : "") }, s.name));
+      row.appendChild(genderPickerEl(s.gender || "", (val) => updateStudentGender(s.id, val)));
       row.appendChild(starsEl(s.skill, 13, (n) => updateStudentSkill(s.id, n)));
       row.appendChild(el("button", {
         class: "icon-btn" + (s.note ? "" : ""),
@@ -1900,6 +2061,17 @@ function renderGenerateView(activeClass) {
   ]);
   panel.appendChild(modeGroup);
 
+  const genderGroup = el("div", {}, [
+    el("label", { class: "control-label" }, "Geschlechter"),
+    el("div", { class: "mode-row" }, [
+      el("button", { class: "mode-btn" + (state.genderMode === "none" ? " active" : ""), onClick: () => { state.genderMode = "none"; render(); } }, "Keine Vorgabe"),
+      el("button", { class: "mode-btn" + (state.genderMode === "separate" ? " active" : ""), onClick: () => { state.genderMode = "separate"; render(); } }, "Getrennte Gruppen"),
+      el("button", { class: "mode-btn" + (state.genderMode === "mixed" ? " active" : ""), onClick: () => { state.genderMode = "mixed"; render(); } }, "Gemischt erzwingen"),
+      el("button", { class: "mode-btn" + (state.genderMode === "balanced" ? " active" : ""), onClick: () => { state.genderMode = "balanced"; render(); } }, "Gleichmäßig verteilen"),
+    ]),
+  ]);
+  panel.appendChild(genderGroup);
+
   const genBtn = el("button", { class: "btn-primary", onClick: generateTeams }, "🔀 Teams erstellen");
   if (activeCount < 2) genBtn.setAttribute("disabled", "disabled");
   panel.appendChild(genBtn);
@@ -1989,7 +2161,7 @@ function renderGenerateView(activeClass) {
         const chip = el("div", { class: "student-chip" + (isDragging ? " dragging" : "") });
         chip.addEventListener("pointerdown", (e) => onPointerDownStudent(e, s.id, team.id));
         const topRow = el("div", { style: "display:flex;align-items:center;justify-content:space-between;gap:6px" });
-        topRow.appendChild(el("span", {}, s.name));
+        topRow.appendChild(el("span", {}, s.name + (genderLabel(s.gender) ? " " + genderLabel(s.gender) : "")));
         const lockBtn = el("button", {
           style: `background:transparent;border:none;padding:0;font-size:13px;line-height:1;color:inherit;opacity:${isLocked ? "1" : "0.4"}`,
           title: isLocked ? "Fixierung aufheben" : "In diesem Team fixieren",
@@ -3688,11 +3860,33 @@ function renderLayoutEditorView() {
   wrap.appendChild(el("div", { class: "control-hint", style: "margin:8px 0" }, `Tische: ${d.tables.length}`));
 
   const groups = computeGroups(d.tables);
+  wrap.appendChild(el("div", { class: "mode-row", style: "margin-top:4px" }, [
+    el("button", { class: "mode-btn" + (d.groupingMode ? " active" : ""), onClick: toggleGroupingMode }, d.groupingMode ? "Fertig" : "🔗 Tischgruppen festlegen"),
+  ]));
+  if (d.groupingMode) {
+    wrap.appendChild(el("div", { class: "control-hint" }, `Tippe die Tische an, die eine Gruppe bilden sollen, dann bestätigen. Ausgewählt: ${(d.groupSelection || []).length}`));
+  }
+
   wrap.appendChild(seatGridEl(d.rows, d.cols, d.tables, {
-    cellClass: (table) => (groups.get(table.id) || []).length > 1 ? "grouped" : "",
+    cellClass: (table) => {
+      const cls = [];
+      if ((groups.get(table.id) || []).length > 1) cls.push("grouped");
+      if (d.groupingMode && (d.groupSelection || []).includes(table.id)) cls.push("selected");
+      return cls.join(" ");
+    },
     cellContent: (table) => (groups.get(table.id) || []).length > 1 ? "⛁" : "⛀",
-    onCellClick: (table, r, c) => toggleLayoutTable(r, c),
+    onCellClick: (table, r, c) => {
+      if (d.groupingMode) { if (table) toggleGroupSelection(table.id); }
+      else toggleLayoutTable(r, c);
+    },
   }));
+
+  if (d.groupingMode) {
+    wrap.appendChild(el("div", { class: "mode-row", style: "margin-top:10px" }, [
+      el("button", { class: "chip-btn", onClick: formGroupFromSelection }, "Gruppe bilden"),
+      el("button", { class: "chip-btn", onClick: ungroupSelection }, "Gruppierung aufheben"),
+    ]));
+  }
 
   const btnRow = el("div", { class: "mode-row", style: "margin-top:16px" }, [
     el("button", { class: "chip-btn", onClick: closeLayoutEditor }, "Abbrechen"),
@@ -3769,7 +3963,9 @@ function renderSeatingPlanView(activeClass) {
     },
     cellContent: (table) => {
       const sid = p.assignments[table.id];
-      return sid ? studentName(activeClass, sid) : "";
+      if (!sid) return "";
+      const s = activeClass.students.find((x) => x.id === sid);
+      return s ? `${s.name}${genderLabel(s.gender) ? " " + genderLabel(s.gender) : ""}` : "?";
     },
     onCellClick: (table) => { if (table) onSeatingTableClick(table.id); },
   }));
@@ -3780,7 +3976,7 @@ function renderSeatingPlanView(activeClass) {
     const menu = el("div", { class: "class-action-menu", style: "margin-top:8px" });
     menu.appendChild(el("div", { class: "control-hint", style: "padding:8px 14px 2px" }, "Wer sitzt hier?"));
     free.forEach((s) => {
-      menu.appendChild(el("button", { class: "class-action-btn", onClick: () => assignStudentToTable(state.pickingForTable, s.id) }, s.name));
+      menu.appendChild(el("button", { class: "class-action-btn", onClick: () => assignStudentToTable(state.pickingForTable, s.id) }, `${s.name}${genderLabel(s.gender) ? " " + genderLabel(s.gender) : ""}`));
     });
     menu.appendChild(el("button", { class: "class-action-btn", onClick: () => { state.pickingForTable = null; render(); } }, "Abbrechen"));
     gridBox.appendChild(menu);
@@ -3799,7 +3995,7 @@ function renderSeatingPlanView(activeClass) {
   const assignedIds = new Set(Object.values(p.assignments));
   const free = activeClass.students.filter((s) => !assignedIds.has(s.id));
   gridBox.appendChild(el("div", { class: "control-label", style: "margin-top:14px" }, "Noch nicht platziert"));
-  gridBox.appendChild(el("div", { class: "control-hint" }, free.length ? free.map((s) => s.name).join(", ") : "Alle Schüler:innen sind platziert."));
+  gridBox.appendChild(el("div", { class: "control-hint" }, free.length ? free.map((s) => s.name + (genderLabel(s.gender) ? " " + genderLabel(s.gender) : "")).join(", ") : "Alle Schüler:innen sind platziert."));
   wrap.appendChild(gridBox);
 
   // --- Regeln ---
@@ -3833,6 +4029,18 @@ function renderSeatingPlanView(activeClass) {
     if (listEl) rulesBox.appendChild(listEl);
   });
   wrap.appendChild(rulesBox);
+
+  // --- Geschlechter (pro Tischgruppe) ---
+  const genderBox = el("div", { class: "control-panel" });
+  genderBox.appendChild(el("label", { class: "control-label" }, "Geschlechter pro Tischgruppe"));
+  genderBox.appendChild(el("div", { class: "control-hint" }, "Gilt für Tischgruppen mit mindestens zwei Plätzen (siehe Layout-Editor)."));
+  genderBox.appendChild(el("div", { class: "mode-row", style: "margin-top:8px" }, [
+    el("button", { class: "mode-btn" + ((p.genderMode || "none") === "none" ? " active" : ""), onClick: () => { p.genderMode = "none"; render(); } }, "Keine Vorgabe"),
+    el("button", { class: "mode-btn" + (p.genderMode === "separate" ? " active" : ""), onClick: () => { p.genderMode = "separate"; render(); } }, "Getrennte Gruppen"),
+    el("button", { class: "mode-btn" + (p.genderMode === "mixed" ? " active" : ""), onClick: () => { p.genderMode = "mixed"; render(); } }, "Gemischt erzwingen"),
+    el("button", { class: "mode-btn" + (p.genderMode === "balanced" ? " active" : ""), onClick: () => { p.genderMode = "balanced"; render(); } }, "Gleichmäßig verteilen"),
+  ]));
+  wrap.appendChild(genderBox);
 
   // --- Generieren ---
   const genBox = el("div", { class: "control-panel" });
