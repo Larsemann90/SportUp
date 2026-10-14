@@ -118,6 +118,16 @@
   .student-chip.dragging{opacity:.35;}
   .chip-stars{font-size:10px;color:#D9A427;}
   .chip-stars .dim{color:#3A3320;}
+  .seat-grid{display:grid;gap:4px;width:max-content;margin:10px 0}
+  .seat-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .seat-cell{width:56px;height:56px;border-radius:8px;border:2px solid transparent;display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;overflow:hidden;word-break:break-word}
+  .seat-cell.tbl{background:#24384A;border-color:#3b5266;cursor:pointer;color:inherit}
+  .seat-cell.has{background:var(--accent);color:#fff}
+  .seat-cell.sel{outline:3px solid #D9A427}
+  .seat-cell.bad{box-shadow:0 0 0 2px #e5484d inset}
+  .seat-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+  .seat-in{width:100%;padding:10px;border-radius:8px;border:1px solid #3b5266;background:transparent;color:inherit;font-size:15px;margin:6px 0}
+  .seat-warn{background:rgba(229,72,77,.12);border:1px solid #e5484d;border-radius:8px;padding:10px;font-size:13px;margin:8px 0}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -195,8 +205,10 @@ function loadState() {
       const data = JSON.parse(raw);
       if (data && data.classes) {
         state.classes = data.classes;
+        if (Array.isArray(data.seatLayouts)) state.seatLayouts = data.seatLayouts;
         state.activeClassId = data.activeClassId || (data.classes[0] && data.classes[0].id) || null;
       }
+      if (data && Array.isArray(data.seatLayouts)) state.seatLayouts = data.seatLayouts;
       if (data && Array.isArray(data.wheelPresets)) {
         state.wheelPresets = data.wheelPresets;
       }
@@ -245,7 +257,7 @@ function toggleTheme() {
 
 function saveState() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ classes: state.classes, activeClassId: state.activeClassId, wheelPresets: state.wheelPresets }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ classes: state.classes, activeClassId: state.activeClassId, wheelPresets: state.wheelPresets, seatLayouts: state.seatLayouts || [] }));
   } catch (e) {
     console.warn("Konnte Klassen nicht speichern:", e);
   }
@@ -593,6 +605,48 @@ function buildUnits(pool, togetherPairs) {
   }));
 }
 
+// ---- Geschlecht ----
+function genderKey(s) { return s && (s.gender === "m" || s.gender === "w") ? s.gender : "o"; }
+function genderCost(groups, mode) {
+  if (mode !== "split" && mode !== "balance") return 0;
+  const cnt = g => { let m = 0, w = 0; g.forEach(s => { const k = genderKey(s); if (k === "m") m++; if (k === "w") w++; }); return [m, w]; };
+  let M = 0, W = 0; groups.forEach(g => { const [m, w] = cnt(g); M += m; W += w; });
+  const r = M + W ? M / (M + W) : 0; let cost = 0;
+  groups.forEach(g => { const [m, w] = cnt(g); cost += mode === "split" ? m * w : Math.pow(m - (m + w) * r, 2); });
+  return cost;
+}
+function cycleGender(id) {
+  const c = getActiveClass(); const s = c && c.students.find(x => x.id === id); if (!s) return;
+  const order = ["", "m", "w", "d"]; s.gender = order[(order.indexOf(s.gender || "") + 1) % order.length];
+  saveState(); render();
+}
+function optimizeTeamGender(slots, lockedIds, idToUnit, apartPairs, mode) {
+  if (mode !== "split" && mode !== "balance") return;
+  const movable = s => !lockedIds.has(s.id) && idToUnit[s.id] && idToUnit[s.id].ids.length === 1;
+  const clash = (stu, team, leaving) => team.students.some(o => o.id !== leaving.id && apartPairs.some(([x, y]) => (x === stu.id && y === o.id) || (y === stu.id && x === o.id)));
+  const costNow = () => genderCost(slots.map(t => t.students), mode);
+  let cost = costNow();
+  for (let it = 0; it < 300 && cost > 1e-9; it++) {
+    let best = null;
+    for (let i = 0; i < slots.length; i++) for (let j = i + 1; j < slots.length; j++)
+      slots[i].students.forEach((a, ai) => { if (!movable(a)) return;
+        slots[j].students.forEach((b, bj) => {
+          if (!movable(b) || genderKey(a) === genderKey(b) || clash(a, slots[j], b) || clash(b, slots[i], a)) return;
+          slots[i].students[ai] = b; slots[j].students[bj] = a;
+          const c = costNow(); slots[i].students[ai] = a; slots[j].students[bj] = b;
+          const d = Math.abs((a.skill || 0) - (b.skill || 0));
+          if (c < cost - 1e-9 && (!best || c < best.c - 1e-9 || (Math.abs(c - best.c) < 1e-9 && d < best.d))) best = { i, j, ai, bj, a, b, c, d };
+        }); });
+    if (!best) break;
+    slots[best.i].students[best.ai] = best.b; slots[best.j].students[best.bj] = best.a; cost = best.c;
+  }
+}
+function genderModeRow(getMode, setMode) {
+  const m = getMode() || "off";
+  const b = (key, label) => el("button", { class: "mode-btn" + (m === key ? " active" : ""), onClick: () => { setMode(key); render(); } }, label);
+  return el("div", { class: "mode-row" }, [b("off", "Egal"), b("split", "Gleiche zusammen"), b("balance", "Gleiches Verhältnis")]);
+}
+
 function generateTeams() {
   const c = getActiveClass();
   if (!c) return;
@@ -685,6 +739,8 @@ function generateTeams() {
     }
     if (!changed) break;
   }
+
+  optimizeTeamGender(slots, lockedIds, idToUnit, apartPairs, state.genderMode || "off");
 
   const finalSlotOf = slotMap();
   const stillViolated = apartPairs.filter(([a, b]) => finalSlotOf[a] && finalSlotOf[b] && finalSlotOf[a] === finalSlotOf[b]).length;
@@ -914,7 +970,7 @@ function downloadJsonFile(filename, data) {
 
 function exportAllData() {
   downloadJsonFile(`SportUp_Backup_${new Date().toISOString().slice(0, 10)}.json`, {
-    type: "sportup-backup-all", exportedAt: Date.now(), classes: state.classes,
+    type: "sportup-backup-all", exportedAt: Date.now(), classes: state.classes, seatLayouts: state.seatLayouts || [],
   });
 }
 
@@ -930,7 +986,8 @@ function remapClassIds(c) {
     ...c,
     id: uid(),
     students: newStudents,
-    rules: { together: remapPairs(c.rules && c.rules.together), apart: remapPairs(c.rules && c.rules.apart) },
+    rules: { together: remapPairs(c.rules && c.rules.together), apart: remapPairs(c.rules && c.rules.apart), apartGroup: remapPairs(c.rules && c.rules.apartGroup) },
+    seatPlans: (c.seatPlans || []).map(pl => ({ ...pl, id: uid(), assignments: Object.fromEntries(Object.entries(pl.assignments || {}).map(([t, sid]) => [t, idMap[sid]]).filter(([t, sid]) => sid)), fixed: (pl.fixed || []).map(x => idMap[x]).filter(Boolean) })),
     tournaments: (c.tournaments || []).map(t => ({ ...t, id: uid() })),
     activeTournamentId: null,
   };
@@ -944,6 +1001,7 @@ function importDataFromFile(file) {
       if (data && Array.isArray(data.classes)) {
         if (!confirm(`Das ersetzt ALLE ${state.classes.length} aktuell gespeicherten Klassen durch ${data.classes.length} Klassen aus der Datei. Fortfahren?`)) return;
         state.classes = data.classes;
+        if (Array.isArray(data.seatLayouts)) state.seatLayouts = data.seatLayouts;
         state.activeClassId = null;
         state.view = "classpicker";
         saveState();
@@ -971,7 +1029,7 @@ function buildClassSharePayload(c) {
   c.students.forEach((s, i) => { idx[s.id] = i; });
   const t = (c.rules && c.rules.together || []).map(([a, b]) => [idx[a], idx[b]]).filter(([a, b]) => a != null && b != null);
   const ap = (c.rules && c.rules.apart || []).map(([a, b]) => [idx[a], idx[b]]).filter(([a, b]) => a != null && b != null);
-  return { n: c.name, s: c.students.map(s => [s.name, s.skill, s.note || ""]), t, ap };
+  return { n: c.name, s: c.students.map(s => [s.name, s.skill, s.note || "", s.gender || ""]), t, ap };
 }
 
 function buildShareUrl(c) {
@@ -983,7 +1041,7 @@ function buildShareUrl(c) {
 function confirmPendingImport() {
   const payload = state.pendingImportPayload;
   if (!payload) return;
-  const students = payload.s.map(([name, skill, note]) => ({ id: uid(), name, skill: skill || 3, note: note || "" }));
+  const students = payload.s.map(([name, skill, note, gender]) => ({ id: uid(), name, skill: skill || 3, note: note || "", gender: gender || "" }));
   const remap = (pairs) => (pairs || []).map(([a, b]) => [students[a] && students[a].id, students[b] && students[b].id]).filter(([a, b]) => a && b);
   const newClass = {
     id: uid(), name: payload.n, students,
@@ -1122,6 +1180,7 @@ function renderHomeView(activeClass) {
     { key: "generate", icon: "🔀", title: "Teams erstellen", subtitle: "Teams bilden & verschieben", onClick: () => { state.view = "generate"; } },
     { key: "pick", icon: "🎲", title: "Zufallsauswahl", subtitle: "Für Aufgaben & Präsentationen", onClick: () => { state.view = "pick"; } },
     { key: "tournament", icon: "🏆", title: "Turnier erstellen", subtitle: "Spielplan & Tabelle", onClick: () => { state.view = "tournament"; } },
+    { key: "seating", icon: "🪑", title: "Sitzplan", subtitle: "Tische, Gruppen & Regeln", onClick: () => { state.view = "seating"; } },
     { key: "pyramid", icon: "🔺", title: "Pyramide", subtitle: "Herausforderungs-Rangliste", onClick: () => { state.view = "pyramid"; } },
   ];
   const grid = el("div", { class: "home-grid" });
@@ -1176,10 +1235,13 @@ function renderRosterView(activeClass) {
   if (activeClass.students.length === 0) {
     wrap.appendChild(el("div", { class: "empty-roster" }, "Noch keine Schüler:innen eingetragen."));
   } else {
+    const gc = k => activeClass.students.filter(x => (x.gender || "") === k).length;
+    wrap.appendChild(el("div", { class: "control-hint", style: "margin-bottom:6px" }, `Geschlecht (Tippen wechselt): m ${gc("m")} · w ${gc("w")} · d ${gc("d")} · offen ${gc("")}`));
     const list = el("div", { class: "roster-list" });
     activeClass.students.forEach(s => {
       const row = el("div", { class: "roster-row" });
       row.appendChild(el("span", { class: "roster-name" + (state.excluded[s.id] ? " excluded" : "") }, s.name));
+      row.appendChild(el("button", { class: "chip-btn" + (s.gender ? " active" : ""), title: "Geschlecht (m/w/d)", onClick: () => cycleGender(s.id) }, s.gender || "–"));
       row.appendChild(starsEl(s.skill, 13, (n) => updateStudentSkill(s.id, n)));
       row.appendChild(el("button", {
         class: "icon-btn" + (s.note ? "" : ""),
@@ -1508,6 +1570,13 @@ function renderGenerateView(activeClass) {
     ]),
   ]);
   panel.appendChild(modeGroup);
+
+  const genderGroup = el("div", {}, [
+    el("label", { class: "control-label" }, "Geschlecht"),
+    genderModeRow(() => state.genderMode, k => { state.genderMode = k; }),
+  ]);
+  if ((state.genderMode || "off") !== "off") genderGroup.appendChild(el("div", { class: "control-hint" }, "Hat Vorrang vor der Aufteilung oben. Geschlecht trägst du im Tab Klasse ein. „d“ und leer werden neutral mitverteilt."));
+  panel.appendChild(genderGroup);
 
   const genBtn = el("button", { class: "btn-primary", onClick: generateTeams }, "🔀 Teams erstellen");
   if (activeCount < 2) genBtn.setAttribute("disabled", "disabled");
@@ -3290,6 +3359,189 @@ function renderPyramidView(activeClass) {
   return wrap;
 }
 
+// ---- Sitzplan ----
+const SEAT = { layoutId: null, edit: null, mode: "table", selG: [], plan: null, sel: null, conflicts: [] };
+const seatLayouts = () => state.seatLayouts || (state.seatLayouts = []);
+const seatLayout = () => seatLayouts().find(l => l.id === SEAT.layoutId);
+const seatTable = (ts, r, c) => ts.find(t => t.r === r && t.c === c);
+const seatGroups = ts => { const m = new Map(); ts.forEach(t => m.set(t.id, t.g || t.id)); return m; };
+function seatAdjSet(ts) { const s = new Set(); ts.forEach(a => ts.forEach(b => { if (Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1) s.add(a.id + "|" + b.id); })); return s; }
+function seatHue(k) { let h = 0; for (const ch of String(k)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; }
+
+function seatGrid(l, cellFn, onCell) {
+  const g = el("div", { class: "seat-grid", style: `grid-template-columns:repeat(${l.cols},56px)` });
+  const groupCount = {}; l.tables.forEach(t => { const k = t.g || t.id; groupCount[k] = (groupCount[k] || 0) + 1; });
+  for (let r = 0; r < l.rows; r++) for (let c = 0; c < l.cols; c++) {
+    const t = seatTable(l.tables, r, c);
+    const info = t ? cellFn(t) : { text: "", cls: "" };
+    const cell = el("div", { class: "seat-cell" + (t ? " tbl " : " ") + info.cls, onClick: () => onCell(r, c, t) }, info.text);
+    if (t && groupCount[t.g || t.id] > 1) cell.style.borderColor = `hsl(${seatHue(t.g)},65%,55%)`;
+    g.appendChild(cell);
+  }
+  return g;
+}
+
+function seatSaveLayout() {
+  const d = SEAT.edit;
+  if (!d.name.trim()) { alert("Bitte einen Namen für das Layout eingeben."); return; }
+  if (!d.tables.length) { alert("Bitte mindestens einen Tisch hinzufügen."); return; }
+  const i = seatLayouts().findIndex(l => l.id === d.id);
+  if (i >= 0) seatLayouts()[i] = d; else seatLayouts().push(d);
+  SEAT.layoutId = d.id; SEAT.edit = null; SEAT.plan = null; saveState(); render();
+}
+
+function seatResize(dr, dc) {
+  const d = SEAT.edit; d.rows = Math.min(20, Math.max(1, d.rows + dr)); d.cols = Math.min(20, Math.max(1, d.cols + dc));
+  d.tables = d.tables.filter(t => t.r < d.rows && t.c < d.cols); render();
+}
+
+function seatGenerate(c) {
+  const l = seatLayout(), p = SEAT.plan, ts = l.tables;
+  const grp = seatGroups(ts), adj = seatAdjSet(ts);
+  const rules = c.rules || {};
+  const fixedAs = {}; Object.entries(p.assignments).forEach(([t, s]) => { if (p.fixed.includes(s)) fixedAs[t] = s; });
+  const freeT = ts.map(t => t.id).filter(id => !fixedAs[id]);
+  const fixedS = new Set(Object.values(fixedAs));
+  const freeS = c.students.map(s => s.id).filter(id => !fixedS.has(id));
+  const nm = id => (c.students.find(s => s.id === id) || {}).name || "?";
+  const score = as => {
+    const pos = {}; Object.entries(as).forEach(([t, s]) => pos[s] = t);
+    const v = [];
+    (rules.together || []).forEach(([a, b]) => { const x = pos[a], y = pos[b]; if (x && y && grp.get(x) !== grp.get(y) && !adj.has(x + "|" + y)) v.push({ msg: `${nm(a)} und ${nm(b)} sollten zusammensitzen, konnten aber nicht zusammengesetzt werden.`, tables: [x, y] }); });
+    (rules.apart || []).forEach(([a, b]) => { const x = pos[a], y = pos[b]; if (x && y && adj.has(x + "|" + y)) v.push({ msg: `${nm(a)} und ${nm(b)} sitzen direkt nebeneinander.`, tables: [x, y] }); });
+    (rules.apartGroup || []).forEach(([a, b]) => { const x = pos[a], y = pos[b]; if (x && y && grp.get(x) === grp.get(y)) v.push({ msg: `${nm(a)} und ${nm(b)} sitzen in derselben Tischgruppe.`, tables: [x, y] }); });
+    return v;
+  };
+  const gm = p.gender || "off", byId = Object.fromEntries(c.students.map(x => [x.id, x]));
+  const gcost = as => { if (gm === "off") return 0; const m = new Map(); Object.entries(as).forEach(([t, sid]) => { const k = grp.get(t); if (!m.has(k)) m.set(k, []); m.get(k).push(byId[sid] || {}); }); return genderCost([...m.values()], gm); };
+  const costOf = (as, v) => v.length * 1000 + gcost(as);
+  let best = null;
+  for (let rs = 0; rs < 60; rs++) {
+    const S = shuffleArr(freeS), T = shuffleArr(freeT), cur = { ...fixedAs };
+    S.forEach((s, i) => { if (T[i]) cur[T[i]] = s; });
+    let v = score(cur), cost = costOf(cur, v);
+    for (let k = 0; k < 300 && cost > 1e-9; k++) {
+      const mv = T.filter(t => cur[t]); if (mv.length < 2) break;
+      const i = Math.floor(Math.random() * mv.length); let j = Math.floor(Math.random() * mv.length); if (i === j) j = (j + 1) % mv.length;
+      [cur[mv[i]], cur[mv[j]]] = [cur[mv[j]], cur[mv[i]]];
+      const nv = score(cur), nc = costOf(cur, nv);
+      if (nc <= cost) { v = nv; cost = nc; } else [cur[mv[i]], cur[mv[j]]] = [cur[mv[j]], cur[mv[i]]];
+    }
+    if (!best || cost < best.cost) best = { as: { ...cur }, v, cost };
+    if (cost <= 1e-9) break;
+  }
+  p.assignments = best.as; SEAT.conflicts = best.v; SEAT.sel = null; render();
+}
+
+function seatSavePlan(c) {
+  const p = SEAT.plan; if (!p.name.trim()) { alert("Bitte einen Namen für den Sitzplan eingeben."); return; }
+  c.seatPlans = c.seatPlans || [];
+  const i = c.seatPlans.findIndex(x => x.id === p.id), copy = JSON.parse(JSON.stringify(p));
+  if (i >= 0) c.seatPlans[i] = copy; else c.seatPlans.push(copy);
+  saveState(); render();
+}
+
+function exportSeatPDF(c) {
+  if (!window.jspdf) { alert("Die PDF-Funktion konnte nicht geladen werden. Bitte prüfe deine Internetverbindung."); return; }
+  const l = seatLayout(), p = SEAT.plan, doc = new window.jspdf.jsPDF({ orientation: l.cols > l.rows ? "landscape" : "portrait" });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  const cs = Math.min(30, (W - 20) / l.cols, (H - 40) / l.rows);
+  doc.setFontSize(16); doc.text(`${p.name || "Sitzplan"} – ${c.name}`, 10, 14);
+  doc.setFontSize(9); doc.text(new Date().toLocaleDateString("de-DE"), 10, 20);
+  doc.setFontSize(Math.max(6, Math.min(10, cs / 3.2)));
+  l.tables.forEach(t => {
+    const x = 10 + t.c * cs, y = 26 + t.r * cs, s = c.students.find(s => s.id === p.assignments[t.id]);
+    doc.setDrawColor(...PDF_ACCENT); doc.rect(x, y, cs - 1, cs - 1);
+    if (s) doc.text(doc.splitTextToSize(s.name, cs - 3), x + (cs - 1) / 2, y + (cs - 1) / 2 - 1, { align: "center" });
+  });
+  doc.save(`Sitzplan-${c.name}.pdf`);
+}
+
+function renderSeatView(c) {
+  const wrap = el("div", { class: "content" });
+  c.rules = c.rules || { together: [], apart: [] }; c.rules.apartGroup = c.rules.apartGroup || [];
+  // --- Layout-Editor ---
+  if (SEAT.edit) {
+    const d = SEAT.edit;
+    wrap.appendChild(el("div", { class: "control-hint" }, "Tippe auf ein Feld, um einen Tisch zu setzen oder zu entfernen. Im Modus „Gruppe“ wählst du Tische aus und fasst sie zu einer Tischgruppe zusammen."));
+    wrap.appendChild(el("input", { class: "seat-in", placeholder: "Name des Layouts", value: d.name, onInput: e => d.name = e.target.value }));
+    const bar = el("div", { class: "seat-bar" }, [
+      el("button", { class: "mode-btn" + (SEAT.mode === "table" ? " active" : ""), onClick: () => { SEAT.mode = "table"; SEAT.selG = []; render(); } }, "Tisch"),
+      el("button", { class: "mode-btn" + (SEAT.mode === "group" ? " active" : ""), onClick: () => { SEAT.mode = "group"; render(); } }, "Gruppe"),
+      el("button", { class: "mode-btn", onClick: () => seatResize(0, -1) }, "− Sp."), el("button", { class: "mode-btn", onClick: () => seatResize(0, 1) }, "+ Sp."),
+      el("button", { class: "mode-btn", onClick: () => seatResize(-1, 0) }, "− Z."), el("button", { class: "mode-btn", onClick: () => seatResize(1, 0) }, "+ Z."),
+    ]);
+    wrap.appendChild(bar);
+    wrap.appendChild(el("div", { class: "seat-scroll" }, seatGrid(d, t => ({ text: "", cls: SEAT.selG.includes(t.id) ? "sel" : "" }), (r, cc, t) => {
+      if (SEAT.mode === "table") { if (t) d.tables = d.tables.filter(x => x !== t); else d.tables.push({ id: `${r}_${cc}`, r, c: cc }); }
+      else if (t) { SEAT.selG = SEAT.selG.includes(t.id) ? SEAT.selG.filter(x => x !== t.id) : [...SEAT.selG, t.id]; }
+      render();
+    })));
+    if (SEAT.mode === "group") wrap.appendChild(el("div", { class: "seat-bar" }, [
+      el("button", { class: "btn-primary-sm", onClick: () => { const g = uid(); d.tables.forEach(t => { if (SEAT.selG.includes(t.id)) t.g = g; }); SEAT.selG = []; render(); } }, "Auswahl gruppieren"),
+      el("button", { class: "mode-btn", onClick: () => { d.tables.forEach(t => { if (SEAT.selG.includes(t.id)) delete t.g; }); SEAT.selG = []; render(); } }, "Gruppe lösen"),
+    ]));
+    wrap.appendChild(el("div", { class: "seat-bar" }, [
+      el("button", { class: "btn-primary-sm", onClick: seatSaveLayout }, "Layout speichern"),
+      el("button", { class: "mode-btn", onClick: () => { SEAT.edit = null; SEAT.selG = []; render(); } }, "Abbrechen"),
+    ]));
+    return wrap;
+  }
+  // --- Layout-Auswahl ---
+  wrap.appendChild(el("div", { class: "control-hint" }, "Layouts sind leere Tischanordnungen und gelten für alle Klassen."));
+  const lbar = el("div", { class: "seat-bar" });
+  seatLayouts().forEach(l => lbar.appendChild(el("button", { class: "mode-btn" + (SEAT.layoutId === l.id ? " active" : ""), onClick: () => { SEAT.layoutId = l.id; SEAT.plan = null; SEAT.sel = null; SEAT.conflicts = []; render(); } }, l.name)));
+  lbar.appendChild(el("button", { class: "btn-primary-sm", onClick: () => { SEAT.edit = { id: uid(), name: "", rows: 6, cols: 6, tables: [] }; SEAT.mode = "table"; render(); } }, "+ Neues Layout"));
+  wrap.appendChild(lbar);
+  const l = seatLayout();
+  if (!l) return wrap;
+  wrap.appendChild(el("div", { class: "seat-bar" }, [
+    el("button", { class: "mode-btn", onClick: () => { SEAT.edit = JSON.parse(JSON.stringify(l)); SEAT.mode = "table"; render(); } }, "Layout bearbeiten"),
+    el("button", { class: "mode-btn", onClick: () => { if (!confirm(`Layout „${l.name}“ löschen?`)) return; state.seatLayouts = seatLayouts().filter(x => x.id !== l.id); SEAT.layoutId = null; SEAT.plan = null; saveState(); render(); } }, "Layout löschen"),
+  ]));
+  // --- Gespeicherte Pläne ---
+  const saved = (c.seatPlans || []).filter(x => x.layoutId === l.id);
+  const sbar = el("div", { class: "seat-bar" }, [el("button", { class: "btn-primary-sm", onClick: () => { SEAT.plan = { id: uid(), name: "", layoutId: l.id, assignments: {}, fixed: [] }; SEAT.conflicts = []; SEAT.sel = null; render(); } }, "Neuer Sitzplan")]);
+  saved.forEach(x => sbar.appendChild(el("button", { class: "mode-btn" + (SEAT.plan && SEAT.plan.id === x.id ? " active" : ""), onClick: () => { SEAT.plan = JSON.parse(JSON.stringify(x)); SEAT.conflicts = []; SEAT.sel = null; render(); } }, x.name)));
+  wrap.appendChild(sbar);
+  const p = SEAT.plan;
+  if (!p || p.layoutId !== l.id) return wrap;
+  const stu = id => c.students.find(s => s.id === id);
+  const grid = seatGrid(l, t => {
+    const s = stu(p.assignments[t.id]);
+    return { text: s ? (p.fixed.includes(s.id) ? "📌" : "") + s.name.split(" ")[0] : "", cls: (s ? "has " : "") + (SEAT.sel === t.id ? "sel " : "") + (SEAT.conflicts.some(v => v.tables.includes(t.id)) ? "bad" : "") };
+  }, (r, cc, t) => { if (t) { SEAT.sel = SEAT.sel === t.id ? null : t.id; render(); } });
+  wrap.appendChild(el("div", { class: "seat-scroll" }, grid));
+  const used = new Set(Object.values(p.assignments)), free = c.students.filter(s => !used.has(s.id));
+  if (SEAT.sel) {
+    const cur = stu(p.assignments[SEAT.sel]), bar = el("div", { class: "seat-bar" });
+    if (cur) {
+      bar.appendChild(el("button", { class: "mode-btn", onClick: () => { delete p.assignments[SEAT.sel]; p.fixed = p.fixed.filter(x => x !== cur.id); render(); } }, `${cur.name} entfernen`));
+      bar.appendChild(el("button", { class: "mode-btn", onClick: () => { p.fixed = p.fixed.includes(cur.id) ? p.fixed.filter(x => x !== cur.id) : [...p.fixed, cur.id]; render(); } }, p.fixed.includes(cur.id) ? "Festsetzung lösen" : "📌 Festsetzen"));
+    } else free.forEach(s => bar.appendChild(el("button", { class: "mode-btn", onClick: () => { p.assignments[SEAT.sel] = s.id; render(); } }, s.name)));
+    wrap.appendChild(el("div", { class: "control-hint" }, cur ? "Ausgewählter Tisch:" : "Wer sitzt hier?"));
+    wrap.appendChild(bar);
+  } else wrap.appendChild(el("div", { class: "control-hint" }, free.length ? `Noch nicht platziert: ${free.map(s => s.name).join(", ")}` : "Alle sind platziert. Tippe auf einen Tisch, um ihn zu ändern."));
+  // --- Regel „nicht gleiche Gruppe“ ---
+  const selA = el("select", { class: "seat-in" }, c.students.map(s => el("option", { value: s.id }, s.name)));
+  const selB = el("select", { class: "seat-in" }, c.students.map(s => el("option", { value: s.id }, s.name)));
+  wrap.appendChild(el("div", { class: "control-hint", style: "margin-top:12px" }, "Zusammensitzen und Nicht-nebeneinander pflegst du im Tab „Regeln“. Hier: wer nicht einmal in dieselbe Tischgruppe darf."));
+  wrap.appendChild(el("div", { class: "seat-bar" }, [selA, selB, el("button", { class: "mode-btn", onClick: () => { if (selA.value !== selB.value) { c.rules.apartGroup.push([selA.value, selB.value]); saveState(); render(); } } }, "+ Regel")]));
+  c.rules.apartGroup.forEach((pr, i) => wrap.appendChild(el("button", { class: "mode-btn", onClick: () => { c.rules.apartGroup.splice(i, 1); saveState(); render(); } }, `${(stu(pr[0]) || {}).name} ≠ Gruppe ≠ ${(stu(pr[1]) || {}).name} ×`)));
+  // --- Generieren / Speichern / PDF ---
+  wrap.appendChild(el("div", { class: "control-hint", style: "margin-top:12px" }, "Geschlecht (pro Tischgruppe). Eintragen im Tab Klasse."));
+  wrap.appendChild(genderModeRow(() => p.gender, k => { p.gender = k; }));
+  wrap.appendChild(el("div", { class: "seat-bar", style: "margin-top:12px" }, [el("button", { class: "btn-primary-sm", onClick: () => seatGenerate(c) }, "🎲 Neu generieren")]));
+  if (SEAT.conflicts.length) wrap.appendChild(el("div", { class: "seat-warn", html: "<strong>Nicht erfüllte Wünsche:</strong><br>" + SEAT.conflicts.map(v => "• " + v.msg).join("<br>") }));
+  wrap.appendChild(el("input", { class: "seat-in", placeholder: "Name dieses Sitzplans", value: p.name, onInput: e => p.name = e.target.value }));
+  wrap.appendChild(el("div", { class: "seat-bar" }, [
+    el("button", { class: "btn-primary-sm", onClick: () => seatSavePlan(c) }, "Speichern"),
+    el("button", { class: "mode-btn", onClick: () => exportSeatPDF(c) }, "Als PDF"),
+    saved.some(x => x.id === p.id) ? el("button", { class: "mode-btn", onClick: () => { if (!confirm("Sitzplan löschen?")) return; c.seatPlans = c.seatPlans.filter(x => x.id !== p.id); SEAT.plan = null; saveState(); render(); } }, "Löschen") : null,
+  ]));
+  return wrap;
+}
+
 function render() {
   const app = document.getElementById("app");
   app.innerHTML = "";
@@ -3317,6 +3569,7 @@ function render() {
   else if (state.view === "pick") viewNode = renderPickView(activeClass);
   else if (state.view === "tournament") viewNode = renderTournamentView(activeClass);
   else if (state.view === "pyramid") viewNode = renderPyramidView(activeClass);
+  else if (state.view === "seating") viewNode = renderSeatView(activeClass);
   else if (state.view === "shareClass") viewNode = renderShareClassView(activeClass);
   else viewNode = renderHomeView(activeClass);
   app.appendChild(viewNode);
