@@ -265,16 +265,25 @@ function saveState() {
 }
 
 // ---- Pyramide ----
-function buildPyramidRows(studentIds) {
+function pyramidClassicSizes(n) {
+  const a = []; let left = n, k = 1;
+  while (left > 0) { a.push(Math.min(k, left)); left -= k; k++; }
+  return a;
+}
+function pyramidEvenSizes(n, levels) {
+  levels = Math.max(1, Math.min(levels, n));
+  const base = Math.floor(n / levels), extra = n % levels;
+  return Array.from({ length: levels }, (_, i) => base + (i >= levels - extra ? 1 : 0));
+}
+function getPyramidSetup(n) {
+  if (!state.pyramidSetup || state.pyramidSetup.n !== n) state.pyramidSetup = { n, sizes: pyramidClassicSizes(n) };
+  return state.pyramidSetup;
+}
+function buildPyramidRows(studentIds, sizes) {
   const shuffled = [...studentIds].sort(() => Math.random() - 0.5);
-  const rows = [];
-  let idx = 0, rowSize = 1;
-  while (idx < shuffled.length) {
-    const take = Math.min(rowSize, shuffled.length - idx);
-    rows.push(shuffled.slice(idx, idx + take));
-    idx += take;
-    rowSize++;
-  }
+  if (!sizes || sizes.reduce((a, b) => a + b, 0) !== shuffled.length) sizes = pyramidClassicSizes(shuffled.length);
+  const rows = []; let idx = 0;
+  sizes.forEach(sz => { if (sz > 0) { rows.push(shuffled.slice(idx, idx + sz)); idx += sz; } });
   return rows;
 }
 
@@ -295,7 +304,9 @@ function isPyramidRematch(pyramid, aId, bId) {
 function startPyramid() {
   const c = getActiveClass();
   if (!c || c.students.length < 2) return;
-  c.pyramid = { rows: buildPyramidRows(c.students.map(s => s.id)), lastMatchPair: null, createdAt: Date.now() };
+  const setup = getPyramidSetup(c.students.length);
+  if (setup.sizes.reduce((a, b) => a + b, 0) !== c.students.length || setup.sizes.some(x => x < 1)) { alert("Die Ebenengrößen müssen zusammen genau der Anzahl der Schüler:innen entsprechen und jeweils mindestens 1 sein."); return; }
+  c.pyramid = { rows: buildPyramidRows(c.students.map(s => s.id), setup.sizes), lastMatchPair: null, createdAt: Date.now() };
   state.pyramidChallengerId = null;
   state.pyramidDefenderId = null;
   saveState();
@@ -3290,7 +3301,32 @@ function renderPyramidView(activeClass) {
   if (!pyramid) {
     const panel = el("div", { class: "control-panel", style: "align-items:center;text-align:center" });
     panel.appendChild(el("div", { style: "font-size:32px;margin-bottom:6px" }, "🔺"));
-    panel.appendChild(el("div", { class: "control-hint", style: "margin-bottom:12px" }, "Alle Schüler:innen werden zufällig auf die Pyramide verteilt. Wer aus der Reihe darunter jemanden aus der Reihe darüber besiegt, tauscht die Plätze."));
+    const N = activeClass.students.length, setup = getPyramidSetup(N);
+    const total = setup.sizes.reduce((x, y) => x + y, 0);
+    panel.appendChild(el("div", { class: "control-hint", style: "margin-bottom:12px" }, "Alle Schüler:innen werden zufällig auf die Ebenen verteilt. Wer aus der Reihe darunter jemanden aus der Reihe darüber besiegt, tauscht die Plätze."));
+    const setSizes = a => { state.pyramidSetup = { n: N, sizes: a }; render(); };
+    panel.appendChild(el("label", { class: "control-label" }, "Aufbau"));
+    panel.appendChild(el("div", { class: "mode-row", style: "margin-bottom:10px" }, [
+      el("button", { class: "mode-btn", onClick: () => setSizes(pyramidClassicSizes(N)) }, "🔺 Klassisch (1-2-3…)"),
+      el("button", { class: "mode-btn", onClick: () => setSizes(pyramidEvenSizes(N, setup.sizes.length)) }, "▭ Gleichmäßig"),
+    ]));
+    panel.appendChild(el("label", { class: "control-label" }, "Anzahl Ebenen"));
+    panel.appendChild(el("div", { class: "stepper", style: "justify-content:center;margin-bottom:10px" }, [
+      el("button", { class: "stepper-btn", onClick: () => setSizes(pyramidEvenSizes(N, setup.sizes.length - 1)) }, "−"),
+      el("span", { class: "stepper-value" }, String(setup.sizes.length)),
+      el("button", { class: "stepper-btn", onClick: () => setSizes(pyramidEvenSizes(N, setup.sizes.length + 1)) }, "+"),
+    ]));
+    panel.appendChild(el("label", { class: "control-label" }, "Plätze pro Ebene (oben → unten)"));
+    setup.sizes.forEach((sz, i) => {
+      const adj = d => { const a = [...setup.sizes]; a[i] = Math.max(1, a[i] + d); setSizes(a); };
+      panel.appendChild(el("div", { style: "display:flex;align-items:center;justify-content:center;gap:12px;margin:4px 0" }, [
+        el("span", { class: "control-hint", style: "min-width:110px;text-align:right" }, i === 0 ? "Ebene 1 (Spitze)" : `Ebene ${i + 1}`),
+        el("button", { class: "stepper-btn", onClick: () => adj(-1) }, "−"),
+        el("span", { class: "stepper-value" }, String(sz)),
+        el("button", { class: "stepper-btn", onClick: () => adj(1) }, "+"),
+      ]));
+    });
+    panel.appendChild(el("div", { class: total === N ? "control-hint" : "seat-warn", style: "margin:10px 0" }, `${total} von ${N} Plätzen vergeben` + (total === N ? " ✓" : total > N ? ` — ${total - N} zu viel` : ` — ${N - total} fehlen noch`)));
     panel.appendChild(el("button", { class: "btn-primary", onClick: startPyramid }, "🔺 Pyramide starten"));
     wrap.appendChild(panel);
     return wrap;
