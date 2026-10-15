@@ -118,9 +118,10 @@
   .student-chip.dragging{opacity:.35;}
   .chip-stars{font-size:10px;color:#D9A427;}
   .chip-stars .dim{color:#3A3320;}
-  .seat-grid{display:grid;gap:4px;width:max-content;margin:10px 0}
+  .seat-grid{display:grid;gap:4px;padding:6px;border:1px dotted #4a6176;border-radius:10px;width:max-content;margin:10px 0}
   .seat-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .seat-cell{width:56px;height:56px;border-radius:8px;border:2px solid transparent;display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;overflow:hidden;word-break:break-word}
+  .seat-cell:not(.tbl){border:2px dashed #4a6176;background:rgba(255,255,255,.03);cursor:pointer;opacity:.85}
   .seat-cell.tbl{background:#24384A;border-color:#3b5266;cursor:pointer;color:inherit}
   .seat-cell.has{background:var(--accent);color:#fff}
   .seat-cell.sel{outline:3px solid #D9A427}
